@@ -64,7 +64,7 @@ setup(
             'kboot = kboot_cli.main:main',
         ],
     },
-    packages=['kboot'], 
+    packages=['kboot', 'kboot_cli'], 
     install_requires = requirements,
     include_package_data = True,
 )
