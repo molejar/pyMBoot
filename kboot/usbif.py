@@ -243,7 +243,7 @@ class PyWinUSB(usbif):
                     new_target.vid = dev.vendor_id
                     new_target.pid = dev.product_id
                     new_target.device = dev
-                    new_target.device.set_raw_data_handler(new_target.rx_handler)
+                    new_target.device.set_raw_data_handler(new_target.__rx_handler)
                     targets.append(new_target)
             except Exception as e:
                 logging.error("Receiving Exception: %s", e)
