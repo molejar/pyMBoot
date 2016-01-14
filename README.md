@@ -43,7 +43,32 @@ With pyKBoot will be automatically installed the following packages:
 Usage
 -----
 
-pyKBoot is distributed with command-line utility, which presents the complete functionality of this library. For its execution put `kboot` into shell and click enter. You will get the following output, witch is describing its usage (for getting the description of individual commands use `kboot COMMAND -?`).
+The API:
+
+``` python
+
+    from kboot import KBoot, Status, SRecFile
+
+    # Create KBoot instance
+    kboot = KBoot()
+
+    # Scan for connected MCU with KBOOT. The default VID = 0x15A2 and PID = 0x0073
+    devs = kboot.scan_usb_devs(VID, PID)
+
+    # Connect to first USB device if founded
+    if devs:
+        kboot.connect(devs[0])
+
+        # now you can run some from implemented methods, if connection will be successful
+        info = kboot.get_mcu_info()
+
+        print(info)
+        ...
+        kboot.disconnect()
+
+```
+
+pyKBoot is distributed with command-line utility `kboot`, which presents the complete functionality of this library. If you write `kboot` into shell and click enter, then you get the description of its usage. For getting the help of individual commands just use `kboot <command name> -?`.
 
 ``` bash
     $ kboot 
@@ -67,7 +92,5 @@ pyKBoot is distributed with command-line utility, which presents the complete fu
     $   write   Write data into MCU memory
 ```
 
-API
----
 
 
