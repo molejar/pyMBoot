@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import sys
+
 from usbif import *
 from utils import *
 
@@ -189,106 +191,133 @@ class KBoot(object):
         self.__pg_end = 100
         self.__abort = False
 
-    def __get_status_value(self, data):
-        return array_to_long(data[4:8])
+    def __parse_status(self, packet):
+        return array_to_long(packet[4:8])
 
-    def __process_cmd(self, data):
+    def __parse_value(self, packet):
+        return array_to_long(packet[4:8])
+
+    def __process_cmd(self, data, timeout=1000):
         """Process Command Data
         :rtype : object
         """
         if self.__usb_dev is None:
-            logging.info('USB Is Disconnected')                               # log status info
-            return (-1, None)
-        logging.debug('TX-CMD [0x]: %s', array_to_string(data))               # log TX raw command data
-        try:
-            self.__usb_dev.write(self.__hidreport.CMD_OUT, data)                 # send USB-HID command OUT report
-            rep_id, rxpkg = self.__usb_dev.read()                               # receive USB-HID command IN report
-            status = self.__get_status_value(rxpkg)                           #
-            logging.debug('RX-CMD [0x]: %s', array_to_string(rxpkg))          # log RX raw command data
-            if status != Status.Success:
-                logging.info('RX-CMD: %s', Status(status).name)               # log status info
-        except Exception as e:
-            logging.error('RX-CMD: %s', str(e))                               # log status info
-            return (-1, None)
-        return (status, rxpkg)
+            logging.info('RX-CMD: USB Disconnected')
+            raise KBootConnectionError('USB Disconnected')
 
-    def __read_data(self, length):
+        # Send USB-HID CMD OUT Report
+        logging.debug('TX-CMD [0x]: %s', array_to_string(data))
+        self.__usb_dev.write(self.__hidreport.CMD_OUT, data)
+
+        # Read USB-HID CMD IN Report
+        try:
+            rxpkg = self.__usb_dev.read(timeout)[1]
+        except:
+            logging.info('RX-CMD: USB Disconnected')
+            raise KBootTimeoutError('USB Disconnected')
+
+        # log RX raw command data
+        logging.debug('RX-CMD [0x]: %s', array_to_string(rxpkg))
+
+        # Parse and validate status flag
+        status = self.__parse_status(rxpkg)
+        if status != Status.Success:
+            logging.info('RX-CMD: %s', Status(status).name)
+            raise KBootCommandError(errval=Status(status).name)
+
+        return rxpkg
+
+    def __read_data(self, length, timeout=1000):
         n = 0
         data = []
         pg_dt = float(self.__pg_end - self.__pg_start)/length
+        self.__abort = False
+
         if self.__usb_dev is None:
-            logging.info('USB Is Disconnected')                               # log status info
-            return (-1, None)
+            logging.info('RX-DATA: USB Disconnected')
+            raise KBootConnectionError('USB Disconnected')
+
+        while n < length:
+            # Read USB-HID DATA IN Report
+            try:
+                rep_id, pkg = self.__usb_dev.read(timeout)
+            except:
+                logging.info('RX-DATA: USB Disconnected')
+                raise KBootTimeoutError('USB Disconnected')
+
+            if rep_id != self.__hidreport.DATA_IN:
+                status = self.__parse_status(pkg)
+                logging.info('RX-DATA: %s' % Status(status).name)
+                raise KBootDataError(mode='read', errval=Status(status).name)
+
+            data += pkg
+            n += len(pkg)
+
+            if self.__pg_func:
+                self.__pg_func(self.__pg_start + int(n * pg_dt))
+
+            if self.__abort:
+                logging.info('Read Aborted By User')
+                return
+
+        # Read USB-HID CMD IN Report
         try:
-            self.__abort = False
-            while n < length:
-                rep_id, pkg = self.__usb_dev.read()                             # receive USB-HID command IN report
-                if rep_id != self.__hidreport.DATA_IN:
-                    status = self.__get_status_value(pkg)
-                    logging.error('RX-DATA: %s', Status(status).name)           # log error info
-                    return (status, None)
-                data += pkg
-                n += len(pkg)
-                if self.__pg_func:
-                    self.__pg_func(self.__pg_start + int(n * pg_dt))
-                if self.__abort:
-                    logging.info('RX-DATA: Aborted By User')                  # log error info
-                    return (-1, None)
-            rep_id, pkg = self.__usb_dev.read()                                 # receive USB-HID command IN report
-            status = self.__get_status_value(pkg)
-            if status != Status.Success:
-                logging.error('RX-DATA: %s', Status(status).name)              # log status info
-            else:
-                logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
-        except IOError as e:
-            logging.error('RX-DATA: %s', str(e))                              # log status error
-            if e.errno == 19:
-                return (-1, None)
-            else:
-                return (Status.Fail, None)
-        except Exception as e:
-            logging.error('RX-DATA: %s', str(e))                              # log status error
-            return (-1, None)
-        return (status, data)
+            rep_id, pkg = self.__usb_dev.read(timeout)
+        except:
+            logging.info('RX-DATA: USB Disconnected')
+            raise KBootTimeoutError('USB Disconnected')
+
+        # Parse and validate status flag
+        status = self.__parse_status(pkg)
+        if status != Status.Success:
+            logging.info('RX-DATA: %s' % Status(status).name)
+            raise KBootDataError(mode='read', errval=Status(status).name)
+
+        logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
+        return data
 
     def __send_data(self, data):
         n = len(data)
         start = 0
         pg_dt = float(self.__pg_end - self.__pg_start)/n
+        self.__abort = False
+
         if self.__usb_dev is None:
-            logging.info('USB Is Disconnected')                               # log status info
-            return (-1, None)
+            logging.info('TX-DATA: USB Disconnected')
+            raise KBootConnectionError('USB Disconnected')
+
+        while n > 0:
+            length = 0x20
+            if n < length:
+                length = n
+            txbuf = data[start:start+length]
+
+            # send USB-HID command OUT report
+            self.__usb_dev.write(self.__hidreport.DATA_OUT, txbuf)
+
+            n -= length
+            start += length
+
+            if self.__pg_func:
+                self.__pg_func(self.__pg_start + int(start * pg_dt))
+
+            if self.__abort:
+                logging.info('Write Aborted By User')
+                return
         try:
-            self.__abort = False
-            while n > 0:
-                length = 0x20
-                if n < length:
-                    length = n
-                txbuf = data[start:start+length]
-                self.__usb_dev.write(self.__hidreport.DATA_OUT, txbuf)         # send USB-HID command OUT report
-                n -= length
-                start += length
-                if self.__pg_func:
-                    self.__pg_func(self.__pg_start + int(start * pg_dt))
-                if self.__abort:
-                    logging.info('TX-DATA: Aborted By User')                  # log error info.
-                    return (-1, None)
-            rep_id, pkg = self.__usb_dev.read()                               # receive USB-HID command IN report
-            status = self.__get_status_value(pkg)
-            if status != Status.Success:
-                logging.error('TX-DATA: %s', Status(status).name)             # log error info
-            else:
-                logging.info('TX-DATA: Send %d Bytes', len(data))             # log status info
-        except IOError as e:
-            logging.error('RX-DATA: %s', str(e))                              # log status error
-            if e.errno == 19:
-                return (-1, None)
-            else:
-                return (Status.Fail, None)
-        except Exception as e:
-            logging.error('TX-DATA: %s', str(e))                              # log error info
-            return (-1, None)
-        return status, pkg
+            rep_id, pkg = self.__usb_dev.read()
+        except:
+            logging.info('TX-DATA: USB Disconnected')
+            raise KBootTimeoutError('USB Disconnected')
+
+        # Parse and validate status flag
+        status = self.__parse_status(pkg)
+        if status != Status.Success:
+            logging.info('TX-DATA: %s' % Status(status).name)
+            raise KBootDataError(mode='write', errval=Status(status).name)
+
+        logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
+        return start
 
     def set_handler(self, progressbar, start_val=0, end_val=100):
         self.__pg_func = progressbar
@@ -299,7 +328,7 @@ class KBoot(object):
         self.__abort = True
 
     def scan_usb_devs(self, kboot_vid=DEFAULT_VID, kboot_pid=DEFAULT_PID):
-        """Scan commected USB devices
+        """ KBoot: Scan commected USB devices
         :rtype : object
         """
         devs = getAllConnectedTargets(kboot_vid, kboot_pid)
@@ -312,46 +341,55 @@ class KBoot(object):
         return devs
 
     def is_connected(self):
+        """ KBoot: Check if device connected
+        """
         if self.__usb_dev is not None:
             return True
         else:
             return False
 
     def connect(self, dev):
+        """ KBoot: Connect device
+        """
         if dev is not None:
             logging.info('Connect: %s', dev.getInfo())
             self.__usb_dev = dev
             self.__usb_dev.open()
             return True
         else:
-            logging.info('USB Is Disconnected')                               # log status info
+            logging.info('USB Disconnected !')
             return False
 
     def disconnect(self):
+        """ KBoot: Disconnect device
+        """
         if self.__usb_dev is not None:
             self.__usb_dev.close()
             self.__usb_dev = None
 
     def get_mcu_info(self):
-        """ KBoot: Get MCU info
-        :return
+        """ KBoot: Get MCU info (available properties collection)
+        :return List of {dict}
         """
         mcu_info = {}
         if self.__usb_dev is None:
-            logging.info('USB Is Disconnected')                               # log status info
+            logging.info('USB Disconnected !')
             return None
+
         for p in Property:
-            status, value = self.get_property(p.value)
-            if status != Status.Success:
+            try:
+                value = self.get_property(p.value)
+            except KBootCommandError:
                 continue
             mcu_info.update({p.name : value})
+
         return mcu_info
 
     def get_property(self, property_tag, ext_mem_identifier=None):
-        """ KBoot: Get property method
-        :param property_tag:
+        """ KBoot: Get value of specified property
+        :param property_tag: The property ID (see Property enumerator)
         :param ext_mem_identifier:
-        :return
+        :return {dict} with 'RAW' and 'STRING' value
         """
         logging.info('TX-CMD: GetProperty->%s', Property(property_tag).name)
         # Prepare GetProperty command
@@ -361,9 +399,7 @@ class KBoot(object):
             cmd[3] = 0x02  # change parameter count to 2
             cmd += long_to_array(ext_mem_identifier, 4)
         # Process GetProperty command
-        status, rpkg = self.__process_cmd(cmd)
-        if status != Status.Success:
-            return status, None
+        rpkg = self.__process_cmd(cmd)
         # Parse property value
         if property_tag == Property.CurrentVersion:
             raw_value = array_to_long(rpkg[8 : 8 + 4])
@@ -407,13 +443,12 @@ class KBoot(object):
             str_value = '{:d}'.format(raw_value)
 
         logging.info('RX-CMD: %s = %s', Property(property_tag).name, str_value)
-        return status, { 'raw_value' : raw_value, 'string' : str_value }
+        return { 'raw_value' : raw_value, 'string' : str_value }
 
     def set_property(self, property_tag, value):
-        """ KBoot: Set property method
+        """ KBoot: Set value of specified property
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
         """
         logging.info('TX-CMD: SetProperty->%s = %d', Property(property_tag).name, value)
         # Prepare SetProperty command
@@ -421,41 +456,44 @@ class KBoot(object):
         cmd += long_to_array(property_tag, 4)
         cmd += long_to_array(value, 4)
         # Process SetProperty command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
-    def flash_read_resource(self, start_address, byte_count, option=1):
-        """ KBoot: Flash read resource method
+    def flash_read_resource(self, start_address, length, option=1):
+        """ KBoot: Read resource of flash module
         :param start_address:
-        :param byte_count:
+        :param length:
         :param option:
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
+        :return resource list
         """
-        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, byte_count)
+        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
         # Prepare FlashReadResource command
         cmd = [self.__command.FlashReadResource, 0x00, 0x00, 0x03]
         cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(byte_count, 4)
+        cmd += long_to_array(length, 4)
         cmd += long_to_array(option, 4)
         # Process FlashReadResource command
-        return self.__process_cmd(cmd)[0]
+        pkg = self.__process_cmd(cmd)
+        rxlen = self.__parse_value(pkg)
+        if length > rxlen:
+            length = rxlen
+        # Process Read Data
+        return self.__read_data(length)
 
     def flash_security_disable(self, backdoor_key):
-        """ KBoot: Flash security disable method
+        """ KBoot: Disable flash security by backdoor key
         :param backdoor_key:
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', array_to_string(backdoor_key))
         # Prepare FlashSecurityDisable command
         cmd = [self.__command.FlashSecurityDisable, 0x00, 0x00, 0x01]
         cmd += backdoor_key
         # Process FlashSecurityDisable command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
     def flash_erase_region(self, start_address, length):
-        """ KBoot: Flash erase region method
+        """ KBoot: Erase specified range of flash
         :param start_address:
         :param length:
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
         """
         logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare FlashEraseRegion command
@@ -463,119 +501,131 @@ class KBoot(object):
         cmd += long_to_array(start_address, 4)
         cmd += long_to_array(length, 4)
         # Process FlashEraseRegion command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd, 5000)
 
     def flash_erase_all(self):
-        """ KBoot: Flash erase all method
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
+        """ KBoot: Erase complete flash memory without recovering flash security section
         """
         logging.info('TX-CMD: FlashEraseAll')
         # Prepare FlashEraseAll command
         cmd = [self.__command.FlashEraseAll, 0x00, 0x00, 0x00]
         # Process FlashEraseAll command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
     def flash_erase_all_unsecure(self):
-        """ KBoot: Flash erase all unsecure method
-        :return Status value (0x0 if OK, for possible errors see Status enumerator)
+        """ KBoot: Erase complete flash memory and recover flash security section
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
         cmd = [self.__command.FlashEraseAllUnsecure, 0x00, 0x00, 0x00]
         # Process FlashEraseAllUnsecure command
-        return self.__process_cmd(cmd)[0]
-
-    def flash_program_once(self, index, data):
-
-        if len(data) > 8:
-            logging.error("Data Length is over 8 bytes")
-            return Status.Fail
-        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, array_to_string(data))
-        # Prepare FlashProgramOnce command
-        cmd = [self.__command.FlashProgramOnce, 0x00, 0x00, 0x03]
-        cmd += long_to_array(index, 4)
-        cmd += long_to_array(len(data), 4)
-        cmd += data
-        # Process FlashProgramOnce command
-        status = self.__process_cmd(cmd)[0]
-        if status == Status.Success:
-            # Process Write Data
-            status = self.__send_data(data)[0]
-        return status
+        self.__process_cmd(cmd)
 
     def flash_read_once(self, index, length):
-
-        if length > 8:
-            length = 8
+        """ KBoot: Read from MCU flash program once region (max 8 bytes)
+        :param index: Start index
+        :param length: Count of bytes
+        :return List of bytes
+        """
+        if (index + length) > 8: length = 8 - index
+        if length == 0:
+            raise ValueError('Index out of range')
         logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d   ]', index, length)
         # Prepare FlashReadOnce command
         cmd = [self.__command.FlashReadOnce, 0x00, 0x00, 0x02]
         cmd += long_to_array(index, 4)
         cmd += long_to_array(length, 4)
         # Process FlashReadOnce command
-        status, _ = self.__process_cmd(cmd)
-        if status != Status.Success:
-            return (status, 0)
+        self.__process_cmd(cmd)
         # Process Read Data
-        status, rdata = self.__read_data(length)
-        if status != Status.Success:
-            return (status, 0)
-        return (Status.Success, rdata)
+        return self.__read_data(length)
+
+    def flash_program_once(self, index, data):
+        """ KBoot: Write into MCU flash program once region (max 8 bytes)
+        :param index: Start index
+        :param data: List of bytes
+        """
+        length = len(data)
+        if (index + length) > 8: length = 8 - index
+        if length == 0:
+            raise ValueError('Index out of range')
+        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, array_to_string(data[:length]))
+        # Prepare FlashProgramOnce command
+        cmd = [self.__command.FlashProgramOnce, 0x00, 0x00, 0x03]
+        cmd += long_to_array(index, 4)
+        cmd += long_to_array(length, 4)
+        cmd += data
+        # Process FlashProgramOnce command
+        self.__process_cmd(cmd)
+        # Process Write Data
+        self.__send_data(data)
+        return length
 
     def read_memory(self, start_address, length):
-
+        """ KBoot: Read data from MCU memory
+        :param start_address: Start address
+        :param length: Count of bytes
+        :return List of bytes
+        """
         if length == 0:
-            return (Status.InvalidArgument, 0)
+            raise ValueError('Data len is zero')
         logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare ReadMemory command
         cmd = [self.__command.ReadMemory, 0x00, 0x00, 0x02]
         cmd += long_to_array(start_address, 4)
         cmd += long_to_array(length, 4)
         # Process ReadMemory command
-        status, _ = self.__process_cmd(cmd)
-        if status != Status.Success:
-            return (status, 0)
+        self.__process_cmd(cmd)
         # Process Read Data
-        status, rdata = self.__read_data(length)
-        if status != Status.Success:
-            return (status, 0)
-        return (Status.Success, rdata)
+        return self.__read_data(length)
 
     def write_memory(self, start_address, data):
-
+        """ KBoot: Write data into MCU memory
+        :param start_address: Start address
+        :param data: List of bytes
+        :return Count of wrote bytes
+        """
         if len(data) == 0:
-            return (Status.InvalidArgument, 0)
+            raise ValueError('Data len is zero')
         logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
         # Prepare WriteMemory command
         cmd = [self.__command.WriteMemory, 0x00, 0x00, 0x03]
         cmd += long_to_array(start_address, 4)
         cmd += long_to_array(len(data), 4)
         # Process WriteMemory command
-        status = self.__process_cmd(cmd)[0]
-        if status == Status.Success:
-            # Process Write Data
-            status = self.__send_data(data)[0]
-        return status
+        self.__process_cmd(cmd)
+        # Process Write Data
+        return self.__send_data(data)
 
-    def fill_memory(self, start_address, length, patern=0xFFFFFFFF):
+    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param start_address: Start address (must be word aligned)
+        :param length: Count of words (must be word aligned)
+        :param pattern: Count of wrote bytes
+        """
         logging.info('TX-CMD: FillMemory [ StartAddr=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, patern)
         # Prepare FillMemory command
         cmd = [self.__command.FillMemory, 0x00, 0x00, 0x03]
         cmd += long_to_array(start_address, 4)
         cmd += long_to_array(length, 4)
-        cmd += long_to_array(patern, 4)
+        cmd += long_to_array(pattern, 4)
         # Process FillMemory command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
     def receive_sb_file(self):
-        # TODO: Not implemented yet
-        return Status.Fail
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"receive_sb_file()\" not implemented yet')
 
     def configure_quad_spi(self):
-        # TODO: Not implemented yet
-        return Status.Fail
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"configure_quad_spi()\" not implemented yet')
 
     def execute(self, jump_address, argument, sp_address):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param jump_address: Jump address (must be word aligned)
+        :param argument: Function arguments address
+        :param sp_address: Stack pointer address
+        """
         logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument, sp_address)
         # Prepare Execute command
         cmd = [self.__command.Execute, 0x00, 0x00, 0x03]
@@ -583,9 +633,14 @@ class KBoot(object):
         cmd += long_to_array(argument, 4)
         cmd += long_to_array(sp_address, 4)
         # Process Execute command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
     def call(self, call_address, argument, sp_address):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param call_address: Call address (must be word aligned)
+        :param argument: Function arguments address
+        :param sp_address: Stack pointer address
+        """
         logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
         # Prepare Call command
         cmd = [self.__command.Call, 0x00, 0x00, 0x03]
@@ -593,11 +648,51 @@ class KBoot(object):
         cmd += long_to_array(argument, 4)
         cmd += long_to_array(sp_address, 4)
         # Process Execute command
-        return self.__process_cmd(cmd)[0]
+        self.__process_cmd(cmd)
 
     def reset(self):
+        """ KBoot: Reset MCU
+        """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
         cmd = [self.__command.Reset, 0x00, 0x00, 0x00]
         # Process Reset command
-        return self.__process_cmd(cmd)[0]
+        try:
+            self.__process_cmd(cmd)
+        except:
+            pass
+
+
+class KBootGenericError(Exception):
+    """ Base Exception class for SRecFile module
+    """
+    _fmt = 'KBoot Error'   #: format string
+
+    def __init__(self, msg=None, **kw):
+        """ Initialize the Exception with the given message. """
+        self.msg = msg
+        for key, value in kw.items():
+            setattr(self, key, value)
+
+    def __str__(self):
+        """ Return the message in this Exception. """
+        if self.msg:
+            return self.msg
+        try:
+            return self._fmt % self.__dict__
+        except (NameError, ValueError, KeyError):
+            e = sys.exc_info()[1]     # current exception
+            return 'Unprintable exception %s: %s' % (repr(e), str(e))
+
+
+class KBootCommandError(KBootGenericError):
+    _fmt = 'Command operation break: %(errval)s'
+
+class KBootDataError(KBootGenericError):
+    _fmt = 'Data %(mode)s break: %(errval)s'
+
+class KBootConnectionError(KBootGenericError):
+    _fmt = 'KBoot connection error'
+
+class KBootTimeoutError(KBootGenericError):
+    _fmt = 'KBoot timeout error'

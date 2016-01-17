@@ -17,6 +17,7 @@
 import os
 import sys
 import pip
+import kboot
 
 from setuptools import setup, find_packages
 
@@ -40,13 +41,14 @@ elif sys.platform.startswith('darwin'):
 
 setup(
     name='kboot',
-    version='0.1.1',
+    version=kboot.__version__,
     description='Python module for Kinetis Bootloader',
     author='Martin Olejar',
     author_email='martin.olejar@gmail.com',
-    keywords="kinetis bootloader",
+    keywords="Kinetis bootloader",
     url="https://github.com/molejar/pyKBoot",
     license="Apache 2.0",
+    platforms = "Mac OS X, Windows, Linux",
     classifiers = [
         'Programming Language :: Python',
         'Development Status :: 3 - Alpha',

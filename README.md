@@ -3,7 +3,9 @@ pyKBoot
 
 pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers.
 
-...
+<p align="center">
+  <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
+</p>
 
 
 Installation
@@ -43,7 +45,7 @@ With pyKBoot will be automatically installed the following packages:
 Usage
 -----
 
-The API:
+The following example is showing how to use `kboot` module in your code.
 
 ``` python
 
@@ -52,17 +54,18 @@ The API:
     # Create KBoot instance
     kboot = KBoot()
 
-    # Scan for connected MCU with KBOOT. The default VID = 0x15A2 and PID = 0x0073
-    devs = kboot.scan_usb_devs(VID, PID)
+    # Scan for connected MCU with KBOOT.
+    devs = kboot.scan_usb_devs()
 
-    # Connect to first USB device if founded
+    # Connect to first USB device from all founded
     if devs:
         kboot.connect(devs[0])
 
         # now you can run some from implemented methods, if connection will be successful
         info = kboot.get_mcu_info()
 
-        print(info)
+        for key, value in info.items():
+            print(" %-20s = 0x%08X (%s)" % (key, value['raw_value'], value['string']))
         ...
         kboot.disconnect()
 

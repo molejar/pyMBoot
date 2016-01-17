@@ -13,18 +13,25 @@
 # limitations under the License.
 
 
-from kboot import KBoot, Property, Status
+from kboot import *
 from srec import SRecFile
 
 
 __author__ = 'Martin Olejar <martin.olejar@gmail.com>'
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 __status__ = 'Development'
 
 __all__ = [
     # classes
     'KBoot',
     'SRecFile',
+
+    # exceptions
+    'KBootGenericError',
+    'KBootCommandError',
+    'KBootDataError',
+    'KBootConnectionError',
+    'KBootTimeoutError',
 
     # enums
     'Property',

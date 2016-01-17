@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging, os, collections
+import os
+import logging
 import threading
+import collections
 from time import time
 from utils import *
 
@@ -407,7 +409,7 @@ class PyUSB(usbif):
         """
         close the interface
         """
-        logging.debug("closing interface")
+        logging.debug("Close USB Interface")
         self.closed = True
         try:
             if self.dev:
