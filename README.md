@@ -1,12 +1,13 @@
 pyKBoot
 =======
 
-pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers.
+pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). 
 
 <p align="center">
   <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
 </p>
 
+KBOOT provides two ways for implementing, ROM bootloader and Flash bootloader, ROM bootloader is only applicable to the Kinetis MCUs which already integrate the ROM and the KBOOT application reside in it. So the ROM bootloader is available during the entire product life cycle.  The opposite side, the Kinetis MCUs without ROM can be programmed through the Flash bootloader. For the Flash bootloader, it runs into RAM and receive the application image, after it program the image into the Flash completely, then it Flash bootloader will go to die, in another word, it will no longer be available again. More details you canh found [here][KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) and [here](https://freescale.jiveon.com/docs/DOC-104512)
 
 Installation
 ------------
@@ -49,25 +50,27 @@ The following example is showing how to use `kboot` module in your code.
 
 ``` python
 
-    from kboot import KBoot, Status, SRecFile
+    from kboot import KBoot
 
-    # Create KBoot instance
-    kboot = KBoot()
+    kboot = KBoot() # Create KBoot instance
 
-    # Scan for connected MCU with KBOOT.
-    devs = kboot.scan_usb_devs()
+    try:
+        devs = kboot.scan_usb_devs()    # Get connected MCU's with KBOOT.
+        if devs:
+            kboot.connect(devs[0])      # Connect to first USB device from all founded
 
-    # Connect to first USB device from all founded
-    if devs:
-        kboot.connect(devs[0])
+            info = kboot.get_mcu_info() # Get MCU info (All KBoot parameters)
+            for key, value in info.items():
+                print(" %-20s = 0x%08X (%s)" % (key, value['raw_value'], value['string']))
+            
+            # Read MCU memory: 100 bytes from address 0
+            data = kboot.read_memory(start_address=0, length=100)
 
-        # now you can run some from implemented methods, if connection will be successful
-        info = kboot.get_mcu_info()
+            ... # other commands
 
-        for key, value in info.items():
-            print(" %-20s = 0x%08X (%s)" % (key, value['raw_value'], value['string']))
-        ...
-        kboot.disconnect()
+            kboot.disconnect()
+    except Exception as e:              # Handle exception
+        print(str(e))
 
 ```
 
@@ -94,6 +97,11 @@ pyKBoot is distributed with command-line utility `kboot`, which presents the com
     $   unlock  Unlock MCU
     $   write   Write data into MCU memory
 ```
+
+TODO
+----
+
+- Add UART interface support
 
 
 
