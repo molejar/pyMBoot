@@ -7,7 +7,9 @@ pyKBoot is an Open Source python based library for configuring and upgrading the
   <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
 </p>
 
-KBOOT provides two ways for implementing, ROM bootloader and Flash bootloader, ROM bootloader is only applicable to the Kinetis MCUs which already integrate the ROM and the KBOOT application reside in it. So the ROM bootloader is available during the entire product life cycle.  The opposite side, the Kinetis MCUs without ROM can be programmed through the Flash bootloader. For the Flash bootloader, it runs into RAM and receive the application image, after it program the image into the Flash completely, then it Flash bootloader will go to die, in another word, it will no longer be available again. More details you canh found [here][KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) and [here](https://freescale.jiveon.com/docs/DOC-104512)
+- KBOOT has two ways of implementation (as ROM bootloader or Flash bootloader). ROM bootloader is only applicable to the Kinetis MCUs which already integrate the ROM and the KBOOT application reside in it. So the ROM bootloader is available during the entire product life cycle.  The opposite side, the Kinetis MCUs without ROM can be programmed through the Flash bootloader. For the Flash bootloader, it runs into RAM and receive the application image, after it program the image into the Flash completely, then it Flash bootloader will go to die, in another word, it will no longer be available again. More details about KBOOT you can found [here](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) and [here](https://freescale.jiveon.com/docs/DOC-104512)
+
+The pyKBoot project is still in alpha phase. Please, check issues for the ongoing tasks or todo tasks.
 
 Installation
 ------------
