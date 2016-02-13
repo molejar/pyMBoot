@@ -89,7 +89,7 @@ class SRecFile:
         self.header = None
         self.start_addr = 0
         self.jump_addr = 0
-        self.data = []
+        self.data = bytearray()
 
         # private members
         self.__empty_value = empty_value
@@ -117,7 +117,6 @@ class SRecFile:
             Returns: True if valid, False if not
         """
         state = False
-
         crc = rec[len(rec)-2:]
 
         # Strip the original checksum and compare with the computed one

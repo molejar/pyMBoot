@@ -1,15 +1,13 @@
 pyKBoot
 =======
 
-pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). 
+pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). Detailed description of KBOOT key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
 <p align="center">
   <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
 </p>
 
-- KBOOT has two ways of implementation (as ROM bootloader or Flash bootloader). ROM bootloader is only applicable to the Kinetis MCUs which already integrate the ROM and the KBOOT application reside in it. So the ROM bootloader is available during the entire product life cycle.  The opposite side, the Kinetis MCUs without ROM can be programmed through the Flash bootloader. For the Flash bootloader, it runs into RAM and receive the application image, after it program the image into the Flash completely, then it Flash bootloader will go to die, in another word, it will no longer be available again. More details about KBOOT you can found [here](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) and [here](https://freescale.jiveon.com/docs/DOC-104512)
-
-The pyKBoot project is still in alpha phase. Please, check issues for the ongoing tasks or todo tasks.
+> The pyKBoot project is still in alpha phase. Please, check issues for the ongoing tasks or todo tasks.
 
 Installation
 ------------
@@ -59,7 +57,7 @@ The following example is showing how to use `kboot` module in your code.
     try:
         devs = kboot.scan_usb_devs()    # Get connected MCU's with KBOOT.
         if devs:
-            kboot.connect(devs[0])      # Connect to first USB device from all founded
+            kboot.connect_usb(devs[0])  # Connect to first USB device from all founded
 
             info = kboot.get_mcu_info() # Get MCU info (All KBoot parameters)
             for key, value in info.items():
@@ -103,7 +101,7 @@ pyKBoot is distributed with command-line utility `kboot`, which presents the com
 TODO
 ----
 
-- Add UART interface support
+- Implement support for UART interface
 
 
 

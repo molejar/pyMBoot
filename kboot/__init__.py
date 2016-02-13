@@ -15,10 +15,11 @@
 
 from kboot import *
 from srec import SRecFile
+from utils import *
 
 
 __author__ = 'Martin Olejar <martin.olejar@gmail.com>'
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 __status__ = 'Development'
 
 __all__ = [
@@ -36,4 +37,10 @@ __all__ = [
     # enums
     'Property',
     'Status',
+
+    #
+    'long_to_array',
+    'string_to_array',
+    'array_to_long',
+    'array_to_string',
 ]

@@ -15,6 +15,7 @@
 import sys
 
 from usbif import *
+from uartif import *
 from utils import *
 
 from flufl.enum import IntEnum
@@ -50,100 +51,88 @@ class Property(IntEnum):
     ExternalMemoryAttributes = 0x19
 
 
-# Status groups.
-StatusGroup_Generic = 0
-StatusGroup_FlashDriver = 1
-StatusGroup_I2CDriver = 2
-StatusGroup_SPIDriver = 3
-StatusGroup_QuadSPIDriver = 4
-StatusGroup_Bootloader = 100
-StatusGroup_SBLoader = 101
-StatusGroup_MemoryInterface = 102
-StatusGroup_PropertyStore = 103
-StatusGroup_AppCrcCheck = 104
-
 class Status(IntEnum):
     # Generic status codes.
-    Success                  = ((StatusGroup_Generic * 100) + 0)
-    Fail                     = ((StatusGroup_Generic * 100) + 1)
-    ReadOnly                 = ((StatusGroup_Generic * 100) + 2)
-    OutOfRange               = ((StatusGroup_Generic * 100) + 3)
-    InvalidArgument          = ((StatusGroup_Generic * 100) + 4)
+    Success                  = 0
+    Fail                     = 1
+    ReadOnly                 = 2
+    OutOfRange               = 3
+    InvalidArgument          = 4
 
     # Flash driver errors.
-    FlashSizeError           = ((StatusGroup_FlashDriver * 100) + 0)
-    FlashAlignmentError      = ((StatusGroup_FlashDriver * 100) + 1)
-    FlashAddressError        = ((StatusGroup_FlashDriver * 100) + 2)
-    FlashAccessError         = ((StatusGroup_FlashDriver * 100) + 3)
-    FlashProtectionViolation = ((StatusGroup_FlashDriver * 100) + 4)
-    FlashCommandFailure      = ((StatusGroup_FlashDriver * 100) + 5)
-    FlashUnknownProperty     = ((StatusGroup_FlashDriver * 100) + 6)
+    FlashSizeError           = 100
+    FlashAlignmentError      = 101
+    FlashAddressError        = 102
+    FlashAccessError         = 103
+    FlashProtectionViolation = 104
+    FlashCommandFailure      = 105
+    FlashUnknownProperty     = 106
 
     # I2C driver errors.
-    I2C_SlaveTxUnderrun      = ((StatusGroup_I2CDriver * 100) + 0)
-    I2C_SlaveRxOverrun       = ((StatusGroup_I2CDriver * 100) + 1)
-    I2C_AribtrationLost      = ((StatusGroup_I2CDriver * 100) + 2)
+    I2C_SlaveTxUnderrun      = 200
+    I2C_SlaveRxOverrun       = 201
+    I2C_AribtrationLost      = 202
 
     # SPI driver errors.
-    SPI_SlaveTxUnderrun      = ((StatusGroup_SPIDriver * 100) + 0)
-    SPI_SlaveRxOverrun       = ((StatusGroup_SPIDriver * 100) + 1)
-
-    # Bootloader errors.
-    UnknownCommand           = ((StatusGroup_Bootloader * 100) + 0)
-    SecurityViolation        = ((StatusGroup_Bootloader * 100) + 1)
-    AbortDataPhase           = ((StatusGroup_Bootloader * 100) + 2)
-    PingError                = ((StatusGroup_Bootloader * 100) + 3)
-    NoResponse               = ((StatusGroup_Bootloader * 100) + 4)
-    NoResponseExpected       = ((StatusGroup_Bootloader * 100) + 5)
-
-    # SB loader errors.
-    RomLdrSectionOverrun     = ((StatusGroup_SBLoader * 100) + 0)
-    RomLdrSignature          = ((StatusGroup_SBLoader * 100) + 1)
-    RomLdrSectionLength      = ((StatusGroup_SBLoader * 100) + 2)
-    RomLdrUnencryptedOnly    = ((StatusGroup_SBLoader * 100) + 3)
-    RomLdrEOFReached         = ((StatusGroup_SBLoader * 100) + 4)
-    RomLdrChecksum           = ((StatusGroup_SBLoader * 100) + 5)
-    RomLdrCrc32Error         = ((StatusGroup_SBLoader * 100) + 6)
-    RomLdrUnknownCommand     = ((StatusGroup_SBLoader * 100) + 7)
-    RomLdrIdNotFound         = ((StatusGroup_SBLoader * 100) + 8)
-    RomLdrDataUnderrun       = ((StatusGroup_SBLoader * 100) + 9)
-    RomLdrJumpReturned       = ((StatusGroup_SBLoader * 100) + 10)
-    RomLdrCallFailed         = ((StatusGroup_SBLoader * 100) + 11)
-    RomLdrKeyNotFound        = ((StatusGroup_SBLoader * 100) + 12)
-    RomLdrSecureOnly         = ((StatusGroup_SBLoader * 100) + 13)
-
-    # Memory interface errors.
-    MemoryRangeInvalid       = ((StatusGroup_MemoryInterface * 100) + 0)
-    MemoryReadFailed         = ((StatusGroup_MemoryInterface * 100) + 1)
-    MemoryWriteFailed        = ((StatusGroup_MemoryInterface * 100) + 2)
-
-    # Property store errors.
-    UnknownProperty          = ((StatusGroup_PropertyStore * 100) + 0)
-    ReadOnlyProperty         = ((StatusGroup_PropertyStore * 100) + 1)
-    InvalidPropertyValue     = ((StatusGroup_PropertyStore * 100) + 2)
-
-    # Property store errors.
-    AppCrcCheckPassed        = ((StatusGroup_AppCrcCheck * 100) + 0)
-    AppCrcCheckFailed        = ((StatusGroup_AppCrcCheck * 100) + 1)
-    AppCrcCheckInactive      = ((StatusGroup_AppCrcCheck * 100) + 2)
-    AppCrcCheckInvalid       = ((StatusGroup_AppCrcCheck * 100) + 3)
-    AppCrcCheckOutOfRange    = ((StatusGroup_AppCrcCheck * 100) + 4)
+    SPI_SlaveTxUnderrun      = 300
+    SPI_SlaveRxOverrun       = 301
 
     # QuadSPI driver errors
-    QspiFlashSizeError       = ((StatusGroup_QuadSPIDriver * 100) + 0)
-    QspiFlashAlignmentError  = ((StatusGroup_QuadSPIDriver * 100) + 1)
-    QspiFlashAddressError    = ((StatusGroup_QuadSPIDriver * 100) + 2)
-    QspiFlashCommandFailure  = ((StatusGroup_QuadSPIDriver * 100) + 3)
-    QspiFlashUnknownProperty = ((StatusGroup_QuadSPIDriver * 100) + 4)
-    QspiNotConfigured        = ((StatusGroup_QuadSPIDriver * 100) + 5)
-    QspiCommandNotSupported  = ((StatusGroup_QuadSPIDriver * 100) + 6)
+    QSPI_FlashSizeError      = 400
+    QSPI_FlashAlignmentError = 401
+    QSPI_FlashAddressError   = 402
+    QSPI_FlashCommandFailure = 403
+    QSPI_FlashUnknownProperty= 404
+    QSPI_NotConfigured       = 405
+    QSPI_CommandNotSupported = 406
+
+    # Bootloader errors.
+    UnknownCommand           = 10000
+    SecurityViolation        = 10001
+    AbortDataPhase           = 10002
+    PingError                = 10003
+    NoResponse               = 10004
+    NoResponseExpected       = 10005
+
+    # SB loader errors.
+    RomLdrSectionOverrun     = 10100
+    RomLdrSignature          = 10101
+    RomLdrSectionLength      = 10102
+    RomLdrUnencryptedOnly    = 10103
+    RomLdrEOFReached         = 10104
+    RomLdrChecksum           = 10105
+    RomLdrCrc32Error         = 10106
+    RomLdrUnknownCommand     = 10107
+    RomLdrIdNotFound         = 10108
+    RomLdrDataUnderrun       = 10109
+    RomLdrJumpReturned       = 10110
+    RomLdrCallFailed         = 10111
+    RomLdrKeyNotFound        = 10112
+    RomLdrSecureOnly         = 10113
+
+    # Memory interface errors.
+    MemoryRangeInvalid       = 10200
+    MemoryReadFailed         = 10201
+    MemoryWriteFailed        = 10202
+
+    # Property store errors.
+    UnknownProperty          = 10300
+    ReadOnlyProperty         = 10301
+    InvalidPropertyValue     = 10302
+
+    # Property store errors.
+    AppCrcCheckPassed        = 10400
+    AppCrcCheckFailed        = 10401
+    AppCrcCheckInactive      = 10402
+    AppCrcCheckInvalid       = 10403
+    AppCrcCheckOutOfRange    = 10404
 
 
+# USB default ID's
+DEFAULT_USB_VID = 0x15A2
+DEFAULT_USB_PID = 0x0073
 
 class KBoot(object):
-    # USB default ID's
-    DEFAULT_VID = 0x15A2
-    DEFAULT_PID = 0x0073
 
     class __hidreport(IntEnum):
         # KBoot USB HID Reports.
@@ -151,6 +140,16 @@ class KBoot(object):
         CMD_IN                   = 0x03
         DATA_OUT                 = 0x02
         DATA_IN                  = 0x04
+
+    class __fptype(IntEnum):
+        # KBoot Framing Packet Type.
+        ACK   = 0xA1
+        NACK  = 0xA2
+        ABORT = 0xA3
+        CMD   = 0xA4
+        DATA  = 0xA5
+        PING  = 0xA6
+        PINGR = 0xA7
 
     class __command(IntEnum):
         # KBoot Commands.
@@ -186,6 +185,7 @@ class KBoot(object):
 
     def __init__(self):
         self.__usb_dev = None
+        self.__uart_dev = None
         self.__pg_func = None
         self.__pg_start = 0
         self.__pg_end = 100
@@ -195,26 +195,81 @@ class KBoot(object):
         return array_to_long(packet[4:8])
 
     def __parse_value(self, packet):
-        return array_to_long(packet[4:8])
+        return array_to_long(packet[8:12])
+
+    def __parse_property(self, property_tag, packet):
+        raw_value = self.__parse_value(packet)
+        if property_tag == Property.CurrentVersion:
+            str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF,
+                                                   (raw_value >> 8) & 0xFF,
+                                                    raw_value & 0xFF)
+        elif property_tag == Property.AvailablePeripherals:
+            str_value = ''
+            for key, value in self.INTERFACES.iteritems():
+                if value[0] & raw_value:
+                    str_value += '{:s}, '.format(key)
+            str_value = str_value[:-2]
+        elif property_tag == Property.FlashSecurityState:
+            if raw_value == 0:
+                str_value = 'Unlocked'
+            else:
+                str_value = 'Locked'
+        elif property_tag == Property.AvailableCommands:
+            str_value = ''
+            for cmd in self.__command:
+                if int(1 << cmd.value) & raw_value:
+                    str_value += '{:s}, '.format(cmd.name)
+            str_value = str_value[:-2]
+        elif (property_tag == Property.MaxPacketSize or
+              property_tag == Property.FlashSectorSize or
+              property_tag == Property.FlashSize or
+              property_tag == Property.RAMSize):
+            if raw_value >= 1024:
+                str_value = '{0:d}kB'.format(raw_value/1024)
+            else:
+                str_value = '{0:d}B'.format(raw_value)
+        elif (property_tag == Property.RAMStartAddress or
+              property_tag == Property.FlashStartAddress or
+              property_tag == Property.SystemDeviceIdent):
+            str_value = '0x{:08X}'.format(raw_value)
+        else:
+            str_value = '{:d}'.format(raw_value)
+        # ---
+        logging.info('RX-CMD: %s = %s', Property(property_tag).name, str_value)
+        return { 'raw_value' : raw_value, 'string' : str_value }
+
 
     def __process_cmd(self, data, timeout=1000):
         """Process Command Data
         :rtype : object
         """
-        if self.__usb_dev is None:
+        if self.__usb_dev is None and self.__uart_dev is None:
             logging.info('RX-CMD: USB Disconnected')
             raise KBootConnectionError('USB Disconnected')
 
-        # Send USB-HID CMD OUT Report
+        # log TX raw command data
         logging.debug('TX-CMD [0x]: %s', array_to_string(data))
-        self.__usb_dev.write(self.__hidreport.CMD_OUT, data)
 
-        # Read USB-HID CMD IN Report
-        try:
-            rxpkg = self.__usb_dev.read(timeout)[1]
-        except:
-            logging.info('RX-CMD: USB Disconnected')
-            raise KBootTimeoutError('USB Disconnected')
+        if self.__usb_dev:
+            # Send USB-HID CMD OUT Report
+            self.__usb_dev.write(self.__hidreport.CMD_OUT, data)
+
+            # Read USB-HID CMD IN Report
+            try:
+                rxpkg = self.__usb_dev.read(timeout)[1]
+            except:
+                logging.info('RX-CMD: USB Disconnected')
+                raise KBootTimeoutError('USB Disconnected')
+        else:
+            # Send UART
+            self.__uart_dev.write(self.__fptype.CMD, data)
+
+            # Read USB-HID CMD IN Report
+            try:
+                rxpkg = self.__uart_dev.read()[1]
+            except:
+                logging.info('RX-CMD: UART Disconnected')
+                raise KBootTimeoutError('UART Disconnected')
 
         # log RX raw command data
         logging.debug('RX-CMD [0x]: %s', array_to_string(rxpkg))
@@ -223,19 +278,19 @@ class KBoot(object):
         status = self.__parse_status(rxpkg)
         if status != Status.Success:
             logging.info('RX-CMD: %s', Status(status).name)
-            raise KBootCommandError(errval=Status(status).name)
+            raise KBootCommandError(errname=Status(status).name, errval=status)
 
         return rxpkg
 
     def __read_data(self, length, timeout=1000):
         n = 0
-        data = []
+        data = bytearray()
         pg_dt = float(self.__pg_end - self.__pg_start)/length
         self.__abort = False
 
-        if self.__usb_dev is None:
-            logging.info('RX-DATA: USB Disconnected')
-            raise KBootConnectionError('USB Disconnected')
+        if self.__usb_dev is None and self.__uart_dev is None:
+            logging.info('RX-DATA: Disconnected')
+            raise KBootConnectionError('Disconnected')
 
         while n < length:
             # Read USB-HID DATA IN Report
@@ -248,9 +303,9 @@ class KBoot(object):
             if rep_id != self.__hidreport.DATA_IN:
                 status = self.__parse_status(pkg)
                 logging.info('RX-DATA: %s' % Status(status).name)
-                raise KBootDataError(mode='read', errval=Status(status).name)
+                raise KBootDataError(mode='read', errname=Status(status).name, errval=status)
 
-            data += pkg
+            data.extend(pkg)
             n += len(pkg)
 
             if self.__pg_func:
@@ -271,7 +326,7 @@ class KBoot(object):
         status = self.__parse_status(pkg)
         if status != Status.Success:
             logging.info('RX-DATA: %s' % Status(status).name)
-            raise KBootDataError(mode='read', errval=Status(status).name)
+            raise KBootDataError(mode='read', errname=Status(status).name, errval=status)
 
         logging.info('RX-DATA: Successfully Received %d Bytes', len(data))
         return data
@@ -282,9 +337,9 @@ class KBoot(object):
         pg_dt = float(self.__pg_end - self.__pg_start)/n
         self.__abort = False
 
-        if self.__usb_dev is None:
-            logging.info('TX-DATA: USB Disconnected')
-            raise KBootConnectionError('USB Disconnected')
+        if self.__usb_dev is None and self.__uart_dev is None:
+            logging.info('TX-DATA: Disconnected')
+            raise KBootConnectionError('Disconnected')
 
         while n > 0:
             length = 0x20
@@ -314,7 +369,7 @@ class KBoot(object):
         status = self.__parse_status(pkg)
         if status != Status.Success:
             logging.info('TX-DATA: %s' % Status(status).name)
-            raise KBootDataError(mode='write', errval=Status(status).name)
+            raise KBootDataError(mode='write', errname=Status(status).name, errval=status)
 
         logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
         return start
@@ -327,7 +382,7 @@ class KBoot(object):
     def abort(self):
         self.__abort = True
 
-    def scan_usb_devs(self, kboot_vid=DEFAULT_VID, kboot_pid=DEFAULT_PID):
+    def scan_usb_devs(self, kboot_vid=DEFAULT_USB_VID, kboot_pid=DEFAULT_USB_PID):
         """ KBoot: Scan commected USB devices
         :rtype : object
         """
@@ -340,6 +395,9 @@ class KBoot(object):
 
         return devs
 
+    def scan_uart_ports(self):
+        return uartif.available_ports()
+
     def is_connected(self):
         """ KBoot: Check if device connected
         """
@@ -348,32 +406,54 @@ class KBoot(object):
         else:
             return False
 
-    def connect(self, dev):
-        """ KBoot: Connect device
+    def connect_usb(self, dev):
+        """ KBoot: Connect by USB
         """
         if dev is not None:
             logging.info('Connect: %s', dev.getInfo())
             self.__usb_dev = dev
             self.__usb_dev.open()
+
             return True
         else:
             logging.info('USB Disconnected !')
             return False
 
+    def connect_uart(self, port, baudrate):
+        """ KBoot: Connect by UART
+        """
+        if port is not None:
+            self.__uart_dev = uartif()
+            self.__uart_dev.open(port, baudrate)
+            if self.__uart_dev.ping():
+                return True
+            else:
+                self.disconnect()
+                return False
+        else:
+            logging.info('UART Disconnected !')
+            return False
+
+
     def disconnect(self):
         """ KBoot: Disconnect device
         """
-        if self.__usb_dev is not None:
+        if self.__usb_dev:
             self.__usb_dev.close()
             self.__usb_dev = None
+        elif self.__uart_dev:
+            self.__uart_dev.close()
+            self.__uart_dev = None
+        else:
+            return
 
     def get_mcu_info(self):
         """ KBoot: Get MCU info (available properties collection)
         :return List of {dict}
         """
         mcu_info = {}
-        if self.__usb_dev is None:
-            logging.info('USB Disconnected !')
+        if self.__usb_dev is None and self.__uart_dev is None:
+            logging.info('Disconnected !')
             return None
 
         for p in Property:
@@ -393,57 +473,15 @@ class KBoot(object):
         """
         logging.info('TX-CMD: GetProperty->%s', Property(property_tag).name)
         # Prepare GetProperty command
-        cmd = [self.__command.GetProperty, 0x00, 0x00, 0x01]
-        cmd += long_to_array(property_tag, 4)
-        if ext_mem_identifier is not None:
+        cmd = bytearray([self.__command.GetProperty, 0x00, 0x00, 0x01])
+        cmd.extend(long_to_array(property_tag, 4))
+        if ext_mem_identifier:
             cmd[3] = 0x02  # change parameter count to 2
-            cmd += long_to_array(ext_mem_identifier, 4)
+            cmd.extend(long_to_array(ext_mem_identifier, 4))
         # Process GetProperty command
         rpkg = self.__process_cmd(cmd)
         # Parse property value
-        if property_tag == Property.CurrentVersion:
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
-        elif property_tag == Property.AvailablePeripherals:
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            str_value = ''
-            for key, value in self.INTERFACES.iteritems():
-                if value[0] & raw_value:
-                    str_value += '{:s}, '.format(key)
-            str_value = str_value[:-2]
-        elif property_tag == Property.FlashSecurityState:
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            if raw_value == 0:
-                str_value = 'Unlocked'
-            else:
-                str_value = 'Locked'
-        elif property_tag == Property.AvailableCommands:
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            str_value = ''
-            for cmd in self.__command:
-                if int(1 << cmd.value) & raw_value:
-                    str_value += '{:s}, '.format(cmd.name)
-            str_value = str_value[:-2]
-        elif (property_tag == Property.MaxPacketSize or
-              property_tag == Property.FlashSectorSize or
-              property_tag == Property.FlashSize or
-              property_tag == Property.RAMSize):
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            if raw_value >= 1024:
-                str_value = '{0:d}kB'.format(raw_value/1024)
-            else:
-                str_value = '{0:d}B'.format(raw_value)
-        elif (property_tag == Property.RAMStartAddress or
-              property_tag == Property.FlashStartAddress or
-              property_tag == Property.SystemDeviceIdent):
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            str_value = '0x{:08X}'.format(raw_value)
-        else:
-            raw_value = array_to_long(rpkg[8 : 8 + 4])
-            str_value = '{:d}'.format(raw_value)
-
-        logging.info('RX-CMD: %s = %s', Property(property_tag).name, str_value)
-        return { 'raw_value' : raw_value, 'string' : str_value }
+        return self.__parse_property(property_tag, rpkg)
 
     def set_property(self, property_tag, value):
         """ KBoot: Set value of specified property
@@ -452,9 +490,9 @@ class KBoot(object):
         """
         logging.info('TX-CMD: SetProperty->%s = %d', Property(property_tag).name, value)
         # Prepare SetProperty command
-        cmd = [self.__command.SetProperty, 0x00, 0x00, 0x02]
-        cmd += long_to_array(property_tag, 4)
-        cmd += long_to_array(value, 4)
+        cmd = bytearray([self.__command.SetProperty, 0x00, 0x00, 0x02])
+        cmd.extend(long_to_array(property_tag, 4))
+        cmd.extend(long_to_array(value, 4))
         # Process SetProperty command
         self.__process_cmd(cmd)
 
@@ -467,10 +505,10 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
         # Prepare FlashReadResource command
-        cmd = [self.__command.FlashReadResource, 0x00, 0x00, 0x03]
-        cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(length, 4)
-        cmd += long_to_array(option, 4)
+        cmd = bytearray([self.__command.FlashReadResource, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(start_address, 4))
+        cmd.extend(long_to_array(length, 4))
+        cmd.extend(long_to_array(option, 4))
         # Process FlashReadResource command
         pkg = self.__process_cmd(cmd)
         rxlen = self.__parse_value(pkg)
@@ -485,8 +523,11 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', array_to_string(backdoor_key))
         # Prepare FlashSecurityDisable command
-        cmd = [self.__command.FlashSecurityDisable, 0x00, 0x00, 0x01]
-        cmd += backdoor_key
+        cmd = bytearray([self.__command.FlashSecurityDisable, 0x00, 0x00, 0x02])
+        if len(backdoor_key) < 8:
+            raise ValueError('Short range of backdoor key')
+        cmd.extend(backdoor_key[3::-1])
+        cmd.extend(backdoor_key[:3:-1])
         # Process FlashSecurityDisable command
         self.__process_cmd(cmd)
 
@@ -497,9 +538,9 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare FlashEraseRegion command
-        cmd = [self.__command.FlashEraseRegion, 0x00, 0x00, 0x02]
-        cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(length, 4)
+        cmd = bytearray([self.__command.FlashEraseRegion, 0x00, 0x00, 0x02])
+        cmd.extend(long_to_array(start_address, 4))
+        cmd.extend(long_to_array(length, 4))
         # Process FlashEraseRegion command
         self.__process_cmd(cmd, 5000)
 
@@ -508,7 +549,7 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAll')
         # Prepare FlashEraseAll command
-        cmd = [self.__command.FlashEraseAll, 0x00, 0x00, 0x00]
+        cmd = bytearray([self.__command.FlashEraseAll, 0x00, 0x00, 0x00])
         # Process FlashEraseAll command
         self.__process_cmd(cmd)
 
@@ -517,7 +558,7 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
-        cmd = [self.__command.FlashEraseAllUnsecure, 0x00, 0x00, 0x00]
+        cmd = bytearray([self.__command.FlashEraseAllUnsecure, 0x00, 0x00, 0x00])
         # Process FlashEraseAllUnsecure command
         self.__process_cmd(cmd)
 
@@ -532,9 +573,9 @@ class KBoot(object):
             raise ValueError('Index out of range')
         logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d   ]', index, length)
         # Prepare FlashReadOnce command
-        cmd = [self.__command.FlashReadOnce, 0x00, 0x00, 0x02]
-        cmd += long_to_array(index, 4)
-        cmd += long_to_array(length, 4)
+        cmd = bytearray([self.__command.FlashReadOnce, 0x00, 0x00, 0x02])
+        cmd.extend(long_to_array(index, 4))
+        cmd.extend(long_to_array(length, 4))
         # Process FlashReadOnce command
         self.__process_cmd(cmd)
         # Process Read Data
@@ -551,10 +592,10 @@ class KBoot(object):
             raise ValueError('Index out of range')
         logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, array_to_string(data[:length]))
         # Prepare FlashProgramOnce command
-        cmd = [self.__command.FlashProgramOnce, 0x00, 0x00, 0x03]
-        cmd += long_to_array(index, 4)
-        cmd += long_to_array(length, 4)
-        cmd += data
+        cmd = bytearray([self.__command.FlashProgramOnce, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(index, 4))
+        cmd.extend(long_to_array(length, 4))
+        cmd.extend(data)
         # Process FlashProgramOnce command
         self.__process_cmd(cmd)
         # Process Write Data
@@ -571,9 +612,9 @@ class KBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare ReadMemory command
-        cmd = [self.__command.ReadMemory, 0x00, 0x00, 0x02]
-        cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(length, 4)
+        cmd = bytearray([self.__command.ReadMemory, 0x00, 0x00, 0x02])
+        cmd.extend(long_to_array(start_address, 4))
+        cmd.extend(long_to_array(length, 4))
         # Process ReadMemory command
         self.__process_cmd(cmd)
         # Process Read Data
@@ -589,9 +630,9 @@ class KBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
         # Prepare WriteMemory command
-        cmd = [self.__command.WriteMemory, 0x00, 0x00, 0x03]
-        cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(len(data), 4)
+        cmd = bytearray([self.__command.WriteMemory, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(start_address, 4))
+        cmd.extend(long_to_array(len(data), 4))
         # Process WriteMemory command
         self.__process_cmd(cmd)
         # Process Write Data
@@ -605,10 +646,10 @@ class KBoot(object):
         """
         logging.info('TX-CMD: FillMemory [ StartAddr=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, patern)
         # Prepare FillMemory command
-        cmd = [self.__command.FillMemory, 0x00, 0x00, 0x03]
-        cmd += long_to_array(start_address, 4)
-        cmd += long_to_array(length, 4)
-        cmd += long_to_array(pattern, 4)
+        cmd = bytearray([self.__command.FillMemory, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(start_address, 4))
+        cmd.extend(long_to_array(length, 4))
+        cmd.extend(long_to_array(pattern, 4))
         # Process FillMemory command
         self.__process_cmd(cmd)
 
@@ -628,10 +669,10 @@ class KBoot(object):
         """
         logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument, sp_address)
         # Prepare Execute command
-        cmd = [self.__command.Execute, 0x00, 0x00, 0x03]
-        cmd += long_to_array(jump_address, 4)
-        cmd += long_to_array(argument, 4)
-        cmd += long_to_array(sp_address, 4)
+        cmd = bytearray([self.__command.Execute, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(jump_address, 4))
+        cmd.extend(long_to_array(argument, 4))
+        cmd.extend(long_to_array(sp_address, 4))
         # Process Execute command
         self.__process_cmd(cmd)
 
@@ -643,10 +684,10 @@ class KBoot(object):
         """
         logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
         # Prepare Call command
-        cmd = [self.__command.Call, 0x00, 0x00, 0x03]
-        cmd += long_to_array(call_address, 4)
-        cmd += long_to_array(argument, 4)
-        cmd += long_to_array(sp_address, 4)
+        cmd = bytearray([self.__command.Call, 0x00, 0x00, 0x03])
+        cmd.extend(long_to_array(call_address, 4))
+        cmd.extend(long_to_array(argument, 4))
+        cmd.extend(long_to_array(sp_address, 4))
         # Process Execute command
         self.__process_cmd(cmd)
 
@@ -655,7 +696,7 @@ class KBoot(object):
         """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
-        cmd = [self.__command.Reset, 0x00, 0x00, 0x00]
+        cmd = bytearray([self.__command.Reset, 0x00, 0x00, 0x00])
         # Process Reset command
         try:
             self.__process_cmd(cmd)
@@ -684,12 +725,17 @@ class KBootGenericError(Exception):
             e = sys.exc_info()[1]     # current exception
             return 'Unprintable exception %s: %s' % (repr(e), str(e))
 
+    def GetErrorVal(self):
+        if self.errval:
+            return self.errval
+        else:
+            return -1
 
 class KBootCommandError(KBootGenericError):
-    _fmt = 'Command operation break: %(errval)s'
+    _fmt = 'Command operation break: %(errname)s'
 
 class KBootDataError(KBootGenericError):
-    _fmt = 'Data %(mode)s break: %(errval)s'
+    _fmt = 'Data %(mode)s break: %(errname)s'
 
 class KBootConnectionError(KBootGenericError):
     _fmt = 'KBoot connection error'

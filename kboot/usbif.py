@@ -66,23 +66,17 @@ class usbif(object):
         pass
 
     def encode_packet(self, report_id, data, pkglen=36):
-        buf = []
-        buf.append(report_id & 0xff)               # Set USB-HID Report ID
-        buf.append(0x00)                           # Set padding
-        buf.append((len(data) >> (8 * 0)) & 0xff)  # Set packet length LSB
-        buf.append((len(data) >> (8 * 1)) & 0xff)  # Set packet length MSB
-        buf += data                                # Set packet data
-        for _ in range(pkglen - len(buf)):
-            buf.append(0x00)                       # Align packet to 36 bytes in default
+        buf = bytearray([report_id, 0x00])             # Set Report ID (byte 0)
+        buf.extend(long_to_array(len(data), 2))        # Set data length
+        buf.extend(data)                               # Set data
+        buf.extend([0x00]*(pkglen - len(buf)))         # Align packet to pkglen (36 bytes in default)
         return buf
 
     def decode_packet(self, data):
-        buf = []
-        report_id = data[0]                        # Get USB-HID Report ID
-        plen = (data[1] << 8) | data[2]            # Get packet length
-        for n in range(plen):
-            buf.append(data[4 + n])                # Get packet data
-        return report_id, buf
+        report_id = data[0]                            # Get USB-HID Report ID
+        plen = array_to_long(data[2:4])                # Get data length
+        buf = data[4:4 + plen]                         # Get data
+        return (report_id, buf)
 
     def write(self, report_id, data):
         return
@@ -157,25 +151,19 @@ class HidApiUSB(usbif):
         """
         write data on the OUT endpoint associated to the HID interface
         """
-        buffer = []
-        buffer.append(report_id & 0xff)              # USB-HID Report ID
-        buffer.append(0x00)                          # padding
-        buffer.append((len(data) >> (8 * 0)) & 0xff) # packet length LSB
-        buffer.append((len(data) >> (8 * 1)) & 0xff) # packet length MSB
-        buffer += data                               # data
-        for _ in range(36 - len(buffer)):
-            buffer.append(0x00)                      # Align packet to 36 bytes
-        #logging.debug("send: %s", data)
-        self.device.write(buffer)
+        rawdata = self.encode_packet(report_id, data)
+        logging.debug('USB-OUT[0x]: %s', array_to_string(rawdata))
+        self.device.write(rawdata)
         return
 
-
-    def read(self, timeout=-1):
+    def read(self, timeout=None):
         """
         Read data on the IN endpoint associated to the HID interface
         :param timeout:
         """
-        return self.device.read(64)
+        rawdata = self.device.read(36, timeout)
+        logging.debug('USB-IN [0x]: %s', array_to_string(rawdata))
+        return self.decode_packet(rawdata)
 
     def close(self):
         """

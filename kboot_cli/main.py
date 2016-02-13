@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2015 Martin Olejar
+# Copyright 2016 Martin Olejar
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,24 +19,21 @@ from __future__ import print_function
 import os
 import sys
 import click
-import struct
 import logging
-
+import kboot
 from intelhex import IntelHex
-from kboot import KBoot, SRecFile
 
 
-VERSION = '0.1.2 Beta'
+VERSION = kboot.__version__
 
 
-def hexdump(data, saddr=0, length=16, sep='.'):
+def hexdump(data, saddr=0, compress=True, length=16, sep='.'):
     """ Return string array in hex dump.format
     :param data:   {list} The data array of {Int}
     :param saddr:  {Int} Absolute Start Address
     :param length: {Int} Nb Bytes by row (max 16).
     :param sep:    {Char} For the text part, {sep} will be used for non ASCII char.
     """
-
     result = []
 
     # Python3 support
@@ -64,6 +61,10 @@ def hexdump(data, saddr=0, length=16, sep='.'):
     address = saddr - offset
     align = True if (offset > 0) else False
 
+    # Print flags
+    prev_line = None
+    print_mark = True
+
     # process data
     for i in xrange(0, len(data) + offset, length):
 
@@ -72,6 +73,16 @@ def hexdump(data, saddr=0, length=16, sep='.'):
             subSrc = data[0: length - offset]
         else:
             subSrc = data[i - offset: i + length - offset]
+            if compress:
+                # compress output string
+                if subSrc == prev_line:
+                    if print_mark:
+                        print_mark = False
+                        result.append(' *')
+                    continue
+                else:
+                    prev_line = subSrc
+                    print_mark = True
 
         if align:
             hexa += '   ' * offset
@@ -101,39 +112,98 @@ def hexdump(data, saddr=0, length=16, sep='.'):
     return '\n'.join(result)
 
 
+class UInt(click.ParamType):
+    """ Custom argument type for UINT
+    """
+    name = 'unsigned int'
+
+    def __repr__(self):
+        return 'UINT'
+
+    def convert(self, value, param, ctx):
+        try:
+            if isinstance(value, (int, long)):
+                return value
+            else:
+                return int(value, 0)
+        except:
+            self.fail('%s is not a valid value' % value, param, ctx)
+
+
+class BDKey(click.ParamType):
+    """ Custom argument type for BackDoor Key
+    """
+    name = 'backdoor key'
+
+    def __repr__(self):
+        return 'BDKEY'
+
+    def convert(self, value, param, ctx):
+        if value[0] == 'S':
+            if len(value) < 18:
+                self.fail('Short key, use 16 ASCII chars !', param, ctx)
+            bdoor_key = [ord(k) for k in value[2:]]
+        else:
+            if len(value) < 34:
+                self.fail('Short key, use 32 HEX chars !', param, ctx)
+            value = value[2:]
+            bdoor_key = []
+            try:
+                for i in range(0, len(value), 2):
+                    bdoor_key.append(int(value[i:i+2], 16))
+            except ValueError:
+                self.fail('Unsupported HEX char in Key !', param, ctx)
+
+        return bdoor_key
+
+
+class ImagePath(click.ParamType):
+    """ Custom argument type for Image File
+    """
+    name = 'image path'
+
+    def __init__(self, mode):
+        self.mode = mode
+
+    def __repr__(self):
+        return 'IPATH'
+
+    def convert(self, value, param, ctx):
+        if not value.lower().endswith(('.bin', '.hex', '.s19', '.srec')):
+            self.fail('Unsupported file type !', param, ctx)
+
+        if self.mode == 'open' and not os.path.lexists(value):
+            self.fail('File [%s] does not exist !' % value, param, ctx)
+
+        return value
+
+
+# Create instances of custom argument types
+UINT    = UInt()
+BDKEY   = BDKey()
+INFILE  = ImagePath('open')
+OUTFILE = ImagePath('save')
+
 # Create KBoot instance
-kboot = KBoot()
-
-# Set default VID, PID
-KBOOT_VID = '0x{:04X}'.format(kboot.DEFAULT_VID)
-KBOOT_PID = '0x{:04X}'.format(kboot.DEFAULT_PID)
+KBOOT = kboot.KBoot()
 
 
-# KBoot common options
+# KBoot base options
 @click.group(context_settings=dict(help_option_names=['-?', '--help']))
-@click.option("--vid", type=click.STRING, default=KBOOT_VID, multiple=False,
-              help='USB Vendor  ID (default: {})'.format(KBOOT_VID))
-@click.option("--pid", type=click.STRING, default=KBOOT_PID, multiple=False,
-              help='USB Product ID (default: {})'.format(KBOOT_PID))
-@click.option("--debug", default=0, multiple=False,
-              help='Set debug level (0-off, 1-info, 2-debug)')
+@click.option("--vid", type=UINT, default=kboot.DEFAULT_USB_VID,
+              help='USB Vendor  ID (default: 0x{:04X})'.format(kboot.DEFAULT_USB_VID))
+@click.option("--pid", type=UINT, default=kboot.DEFAULT_USB_PID,
+              help='USB Product ID (default: 0x{:04X})'.format(kboot.DEFAULT_USB_PID))
+@click.option("--debug", type=click.IntRange(0, 2, True), default=0, help='Set debug level (0-off, 1-info, 2-debug)')
 @click.version_option(version=VERSION)
 def cli(vid, pid, debug):
+    errmsg = 'No MCU with KBoot detected !'
+
     if debug > 0:
         loglevel = [logging.NOTSET, logging.INFO, logging.DEBUG]
         logging.basicConfig(level=loglevel[debug])
 
-    try:
-        usb_vid = int(vid, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--vid\" argument !' % vid)
-
-    try:
-        usb_pid = int(pid, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--pid\" argument !' % pid)
-
-    devs = kboot.scan_usb_devs(usb_vid, usb_pid)
+    devs = KBOOT.scan_usb_devs(vid, pid)
 
     if devs:
         index = 0
@@ -148,17 +218,18 @@ def cli(vid, pid, debug):
             click.echo('')
             index = int(c, 10)
 
-        # Connect KBoot device
-        kboot.connect(devs[index])
-    else:
-        raise Exception('No MCU with KBoot detected !')
+        # Connect KBoot USB device
+        KBOOT.connect_usb(devs[index])
+        return
+
+    raise Exception(errmsg)
 
 
 # KBoot MCU Info Command
 @cli.command("info", short_help="Get MCU info (kboot properties)")
 def info():
     # Read KBoot MCU Info (Properties collection)
-    info = kboot.get_mcu_info()
+    info = KBOOT.get_mcu_info()
 
     # Print KBoot MCU Info
     click.echo("-" * 50)
@@ -169,41 +240,21 @@ def info():
     click.echo("-" * 50)
 
     # Disconnect KBoot device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
 
 # KBoot MCU memory write command
 @cli.command("write", short_help="Write data into MCU memory")
-@click.option('-a', '--addr', type=click.STRING, default='0x00000000', help='Start Address (default: 0x00000000)')
-@click.option('-o', '--offset', type=click.STRING, default='0x00000000',
-              help='Offset of input data (default: 0x00000000)')
-@click.option('-f', '--file', type=click.STRING, required=True,
+@click.option('-a', '--addr', type=UINT, default=0, help='Start Address (default: 0x00000000)')
+@click.option('-o', '--offset', type=UINT, default=0, help='Offset of input data (default: 0x00000000)')
+@click.option('-f', '--file', type=INFILE, required=True,
               help='Input file name with extension: *.bin, *.hex, *.s19 or *.srec')
 def write(addr, offset, file):
 
-    try:
-        saddr = int(addr, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--addr\" argument !' % addr)
-
-    try:
-        foffset = int(offset, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--offset\" argument !' % offset)
-
-    if file and not file.lower().endswith(('.bin', '.hex', '.s19', '.srec')):
-        raise Exception('Not supported file type !')
-
-    if os.path.lexists(file):
-        raise Exception('File does not exist [%s]' % file)
-
-    data = []
-
     if file.lower().endswith('.bin'):
         with open(file, "rb") as f:
-            raw_data = f.read()
+            data = f.read()
             f.close()
-        data += struct.unpack("%iB" % len(raw_data), raw_data)
     elif file.lower().endswith('.hex'):
         ihex = IntelHex()
         try:
@@ -212,185 +263,141 @@ def write(addr, offset, file):
             raise Exception('Could not read from file: %s \n [%s]' % (file, str(e)))
         else:
             dhex = ihex.todict()
-            data = [0xFF]*(max(dhex.keys()) + 1)
+            data = bytearray([0xFF]*(max(dhex.keys()) + 1))
             for i, val in dhex.items():
                 data[i] = val
     else:
-        srec = SRecFile()
+        srec = kboot.SRecFile()
         try:
             srec.open(file)
         except Exception as e:
             raise Exception('Could not read from file: %s \n [%s]' % (file, str(e)))
         else:
             data = srec.data
-            if saddr ==  0:
-                saddr = srec.start_addr
+            if addr ==  0:
+                addr = srec.start_addr
 
-
-    if foffset < len(data):
-        data = data[foffset:]
+    if offset < len(data):
+        data = data[offset:]
 
     click.echo('\n Writing into MCU memory, please wait !\n')
 
-    #kboot.flash_erase_region(saddr, len(data))
-    kboot.flash_erase_all_unsecure()
+    # Read Flash Sector Size of connected MCU
+    flashSectorSize = KBOOT.get_property(kboot.Property.FlashSectorSize)['raw_value']
 
-    # Write data into MCU memory
-    kboot.write_memory(saddr, data)
+    # Align Erase Start Address and Len to Flash Sector Size
+    saddr = (addr & ~(flashSectorSize - 1))
+    slen = (len(data) & ~(flashSectorSize - 1))
+    if (len(data) % flashSectorSize) > 0:
+        slen += flashSectorSize
+
+    # Erase specified region in MCU Flash memory
+    KBOOT.flash_erase_region(saddr, slen)
+
+    # Write data into MCU Flash memory
+    KBOOT.write_memory(addr, data)
 
     # Disconnect KBoot device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
-    click.secho("\n Done Successfully. \n")
+    click.secho(" Done Successfully. \n")
 
 
 # KBoot MCU memory read command
 @cli.command("read", short_help="Read data from MCU memory")
-@click.option('-a', '--addr', type=click.STRING, default='0x00000000', help='Start Address (default: 0x00000000)')
-@click.option('-l', '--length', type=click.STRING, required=True, help='Count of bytes')
-@click.option('-f', '--file', type=click.STRING, help='Output file name with extension: *.bin, *.hex or *.s19')
-def read(addr, length, file):
-
-    try:
-        saddr = int(addr, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--addr\" argument !' % addr)
-
-    try:
-        dlen = int(length, 0)
-    except ValueError:
-        raise Exception('Invalid value \"%s\" for \"--length\" argument !' % length)
-
-    if file and not file.lower().endswith(('.bin', '.hex', '.s19', '.srec')):
-        raise Exception('Not supported file type !')
+@click.option('-a', '--addr', type=UINT, default=0, help='Start Address (default: 0x00000000)')
+@click.option('-l', '--length', type=UINT, required=True, help='Count of bytes')
+@click.option('-c/', '--compress/', is_flag=True, default=False, help='Compress dump output')
+@click.option('-f', '--file', type=OUTFILE, help='Output file name with extension: *.bin, *.hex or *.s19')
+def read(addr, length, compress, file):
 
     click.echo("\n Reading from MCU memory, please wait !\n")
 
     # Call KBoot flash erase all function
-    data = kboot.read_memory(saddr, dlen)
+    data = KBOOT.read_memory(addr, length)
 
     # Disconnect KBoot Device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
     if file is None:
-        click.echo(hexdump(data, saddr))
+        click.echo(hexdump(data, addr, compress))
     else:
         if file.lower().endswith('.bin'):
             with open(file, "wb") as f:
-                f.write(bytearray(data))
+                f.write(data)
                 f.close()
         elif file.lower().endswith('.hex'):
             ihex = IntelHex()
             ihex.frombytes(data, 0)
-            ihex.start_addr = saddr
+            ihex.start_addr = addr
             try:
                 ihex.tofile(file, format='hex')
             except Exception as e:
                 raise Exception('Could not write to file: %s \n [%s]' % (file, str(e)))
         else:
-            srec = SRecFile()
-            srec.header = "KBOOT"
-            srec.start_addr = saddr
+            srec = kboot.SRecFile()
+            srec.header = "pyKBoot"
+            srec.start_addr = addr
             srec.data = data
             try:
                 srec.save(file)
             except Exception as e:
                 raise Exception('Could not write to file: %s \n [%s]' % (file, str(e)))
 
+        click.secho(" Successfully saved into: %s. \n" % file)
+
 
 # KBoot MCU memory erase command
 @cli.command("erase", short_help="Erase MCU memory")
-@click.option('-a', '--addr', type=click.STRING, default='0x00000000', help='Start Address (default: 0x00000000)')
-@click.option('-l', '--length', type=click.STRING, help='Count of bytes (must be aligned by flash erase block size)')
+@click.option('-a', '--addr', type=UINT, default=0, help='Start Address (default: 0x00000000)')
+@click.option('-l', '--length', type=UINT, help='Count of bytes (must be aligned to flash block size)')
 @click.option('-m', '--mass', type=click.BOOL, default=False, help='Erase complete MCU memory')
 def erase(addr, length, mass):
 
     if mass or not length:
         # Call KBoot flash erase all function
-        kboot.flash_erase_all_unsecure()
+        KBOOT.flash_erase_all_unsecure()
     else:
-        try:
-            saddr = int(addr, 0)
-        except ValueError:
-            raise Exception('Invalid value \"%s\" for \"--addr\" argument !' % addr)
-
-        try:
-            dlen = int(length, 0)
-        except ValueError:
-            raise Exception('Invalid value \"%s\" for \"--length\" argument !' % length)
-
         # Call KBoot flash erase region function
-        kboot.flash_erase_region(saddr, dlen)
+        KBOOT.flash_erase_region(addr, length)
 
     # Disconnect KBoot Device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
 
 # KBoot MCU unlock command
 @cli.command("unlock", short_help="Unlock MCU")
-@click.option('-k', '--key', type=click.STRING, help='Use backdoor key as ASCI = S:TEST...F or HEX = X:010203...0F')
+@click.option('-k', '--key', type=BDKEY, help='Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08')
 def unlock(key):
 
     if key is None:
         # Call KBoot flash erase all and unsecure function
-        kboot.flash_erase_all_unsecure()
+        KBOOT.flash_erase_all_unsecure()
     else:
-        if key[0] == 'S':
-            if len(key) < 18:
-                raise Exception('Short key, use 16 ASCII chars !')
-            bdoor_key = [ord(k) for k in key[2:]]
-        else:
-            if len(key) < 34:
-                raise Exception('Short key, use 32 HEX chars !')
-            key = key[2:]
-            bdoor_key = []
-            try:
-                for i in range(0, len(key), 2):
-                    bdoor_key.append(int(key[i:i+2], 16))
-            except ValueError:
-                raise Exception('Unsupported HEX char in Key !')
-
         # Call KBoot flash security disable function
-        kboot.flash_security_disable(bdoor_key)
+        KBOOT.flash_security_disable(key)
 
     # Disconnect KBoot Device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
 
 # KBoot MCU fill memory command
 @cli.command("fill", short_help="Fill MCU memory with specified patern")
-@click.option('-a', '--addr', type=click.STRING, default='0x00000000', help='Start Address (default: 0x00000000)')
-@click.option('-l', '--length', type=click.STRING, required=True, help='Count of bytes')
-@click.option('-p', '--pattern', type=click.STRING, default='0xFFFFFFFF', help='Pattern format')
+@click.option('-a', '--addr', type=UINT, default=0, help='Start Address (default: 0x00000000)')
+@click.option('-l', '--length', type=UINT, required=True, help='Count of bytes')
+@click.option('-p', '--pattern', type=UINT, default=0xFFFFFFFF, help='Pattern format (default: 0xFFFFFFFF)')
 def fill(addr, length, pattern):
-
-    try:
-        saddr = int(addr, 0)
-    except ValueError:
-        raise Exception('\n Invalid value \"%s\" for \"--addr\" argument !\n' % addr)
-
-    try:
-        slen = int(length, 0)
-    except ValueError:
-        raise Exception('\n Invalid value \"%s\" for \"--length\" argument !\n' % length)
-
-    try:
-        spat = int(pattern, 0)
-    except ValueError:
-        raise Exception('\n Invalid value \"%s\" for \"--length\" argument !\n' % pattern)
-
     # Call KBoot fill memory function
-    kboot.fill_memory(saddr, slen, spat)
-
+    KBOOT.fill_memory(addr, length, pattern)
     # Disconnect KBoot Device
-    kboot.disconnect()
+    KBOOT.disconnect()
 
 
 # KBoot MCU reset command
 @cli.command("reset", short_help="Reset MCU")
 def reset():
     # Call KBoot MCU reset function
-    kboot.reset()
+    KBOOT.reset()
 
 
 def main():
@@ -398,7 +405,7 @@ def main():
         cli(obj={})
     except Exception as e:
         # Disconnect KBoot Device
-        kboot.disconnect()
+        KBOOT.disconnect()
         # Print Error Info
         click.secho('\n<E> %s\n' % str(e))
         sys.exit(1)
