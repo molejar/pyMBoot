@@ -9,39 +9,37 @@ pyKBoot is an Open Source python based library for configuring and upgrading the
 
 > The pyKBoot project is still in alpha phase. Please, check issues for the ongoing tasks or todo tasks.
 
+Dependencies
+------------
+
+- [Python 3.x](https://www.python.org) - The interpreter
+- [Click](http://click.pocoo.org/6) - Python package for creating beautiful command line interface.
+- [PyWinUSB](https://github.com/rene-aguirre/pywinusb) - Python package that simplifies USB-HID communications on Windows OS.
+- [PyUSB](https://walac.github.io/pyusb/) - Python package to access USB devices in Linux OS.
+- [pyserial](https://github.com/pyserial/pyserial) - Python package for communication over Serial port in Linux and Windows OS.
+
 Installation
 ------------
 
-To install the latest development version (master branch) execute in shell the following command:
+To install the latest version from master branch execute in shell following commands:
 
 ``` bash
-    $ pip install --pre -U https://github.com/molejar/pyKBoot/archive/master.zip
+    $ pip3 install -U https://github.com/molejar/pyKBoot/archive/master.zip
 ```
 
-Note that you may run into permissions issues running these commands.
-You have a few options here:
-
-1. Run with `sudo -H` to install pyKBoot and dependencies globally
-2. Specify the `--user` option to install local to your user
-3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
-
-You can also install from source by executing in shell the following commands:
+In case of development, install it from cloned sources:
 
 ``` bash
     $ git clone https://github.com/molejar/pyKBoot.git
     $ cd pyKBoot
-    $ python setup.py install
+    $ pip3 install -U -e .
 ```
 
-With pyKBoot will be automatically installed the following packages:
+**NOTE:** You may run into a permissions issues running these commands. Here are a few options how to fix it:
 
-  - [flufl.enum](https://pypi.python.org/pypi/flufl.enum) - A Python enumeration extension for easy to read syntax
-  - [click](http://click.pocoo.org/6) - A Python "Command Line Interface Creation Kit"
-  - [intelhex](https://pypi.python.org/pypi/IntelHex) - Python library for Intel HEX files manipulations
-  - [pyusb](https://pypi.python.org/pypi/pyusb) - Python USB communications module for Linux OS
-  - [pywinusb](https://pypi.python.org/pypi/pywinusb) - Python USB/HID communications module for Windows OS
-  - [hidapi](https://pypi.python.org/pypi/hidapi/0.7.99.post9) - Python USB/HID communications module for OS X
-
+1. Run with `sudo` to install pyIMX and dependencies globally
+2. Specify the `--user` option to install locally into your home directory (export "~/.local/bin" into PATH variable if haven't).
+3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
 
 Usage
 -----
@@ -50,52 +48,109 @@ The following example is showing how to use `kboot` module in your code.
 
 ``` python
 
-    from kboot import KBoot
+    import kboot
 
-    kboot = KBoot() # Create KBoot instance
+    kb = kboot.KBoot() # Create KBoot instance
 
     try:
-        devs = kboot.scan_usb_devs()    # Get connected MCU's with KBOOT.
+        devs = kboot.scan_usb()    # Get connected MCU's with KBOOT.
         if devs:
-            kboot.connect_usb(devs[0])  # Connect to first USB device from all founded
+            kb.open_usb(devs[0])  # Connect to first USB device from all founded
 
-            info = kboot.get_mcu_info() # Get MCU info (All KBoot parameters)
+            info = kb.get_mcu_info() # Get MCU info (All KBoot parameters)
             for key, value in info.items():
                 print(" %-20s = 0x%08X (%s)" % (key, value['raw_value'], value['string']))
             
             # Read MCU memory: 100 bytes from address 0
-            data = kboot.read_memory(start_address=0, length=100)
+            data = kb.read_memory(start_address=0, length=100)
 
             ... # other commands
 
-            kboot.disconnect()
+            kb.close()
     except Exception as e:              # Handle exception
         print(str(e))
 
 ```
 
-pyKBoot is distributed with command-line utility `kboot`, which presents the complete functionality of this library. If you write `kboot` into shell and click enter, then you get the description of its usage. For getting the help of individual commands just use `kboot <command name> -?`.
+[ kboot ] Tool
+----------------
+
+pyKBoot is distributed with command-line utility `kboot`, which presents the complete functionality of this library. 
+If you write `kboot` into shell and click enter, then you get the description of its usage. For getting the help of 
+individual commands just use `kboot <command name> -?`.
 
 ``` bash
-    $ kboot 
-    $
-    $ Usage: kboot [OPTIONS] COMMAND [ARGS]...
-    $ 
-    $ Options:
-    $   --vid TEXT       USB Vendor  ID (default: 0x15A2)
-    $   --pid TEXT       USB Product ID (default: 0x0073)
-    $   --debug INTEGER  Set debug level (0-off, 1-info, 2-debug)
-    $   --version        Show the version and exit.
-    $   -?, --help       Show this message and exit.
-    $
-    $ Commands:
-    $   erase   Erase MCU memory
-    $   fill    Fill MCU memory with specified patern
-    $   info    Get MCU info (kboot properties)
-    $   read    Read data from MCU memory
-    $   reset   Reset MCU
-    $   unlock  Unlock MCU
-    $   write   Write data into MCU memory
+  $ kboot --help
+  
+    Usage: kboot [OPTIONS] COMMAND [ARGS]...
+    
+      Kinetis Bootloader Command Line Interface, version: 0.1.4
+      
+      NOTE: Development version, be carefully with it usage !
+      
+    Options:
+      --vid UNSIGNED INT         USB Vendor  ID (default: 0x15A2)
+      --pid UNSIGNED INT         USB Product ID (default: 0x0073)
+      -d, --debug INTEGER RANGE  Debug level: 0-off, 1-info, 2-debug
+      -v, --version              Show the version and exit.
+      -?, --help                 Show this message and exit.
+    
+    Commands:
+      erase   Erase MCU memory
+      fill    Fill MCU memory with specified patern
+      info    Get MCU info (kboot properties)
+      read    Read data from MCU memory
+      reset   Reset MCU
+      unlock  Unlock MCU
+      write   Write data into MCU memory
+```
+
+####$ info command
+
+``` bash
+   $ kboot info
+   
+     CurrentVersion:
+      = 1.0.0
+     AvailablePeripherals:
+      - UART
+      - I2C-Slave
+      - SPI-Slave
+      - USB-HID
+     FlashStartAddress:
+      = 0x00000000
+     FlashSize:
+      = 256kB
+     FlashSectorSize:
+      = 1kB
+     FlashBlockCount:
+      = 2
+     AvailableCommands:
+      - FlashEraseAll
+      - FlashEraseRegion
+      - ReadMemory
+      - FillMemory
+      - FlashSecurityDisable
+      - ReceiveSBFile
+      - Call
+      - Reset
+      - SetProperty
+     VerifyWrites:
+      = 1
+     MaxPacketSize:
+      = 32B
+     ReservedRegions:
+      = 0
+     ValidateRegions:
+      = 1
+     RAMStartAddress:
+      = 0x1FFFE000
+     RAMSize:
+      = 32kB
+     SystemDeviceIdent:
+      = 0x23161D82
+     FlashSecurityState:
+      = Unlocked
 ```
 
 TODO

@@ -14,30 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import sys
-import pip
 import kboot
 
 from setuptools import setup, find_packages
 
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
-
-requirements = ['flufl.enum>=4.1', 'click>=6.0', 'intelhex>=2.0']
+requirements = ['click>=6.0', 'pyserial>=3.0']
 
 if sys.platform.startswith('linux'):
-    requirements.extend([
-        'pyusb>=1.0.0b2',
-    ])
+    requirements.append('pyusb>=1.0.0b2')
 elif sys.platform.startswith('win'):
-    requirements.extend([
-        'pywinusb>=0.4.0',
-    ])
-elif sys.platform.startswith('darwin'):
-    requirements.extend([
-        'hidapi',
-    ])
+    requirements.append('pywinusb>=0.4.0')
+else:
+    raise Exception('Not supported platform !')
 
 setup(
     name='kboot',
@@ -60,13 +49,12 @@ setup(
         'Topic :: Software Development :: Embedded Systems',
         'Topic :: Utilities',
     ],
-    long_description=read('pypi_readme.rst'),
     entry_points = {
         'console_scripts': [
-            'kboot = kboot_cli.main:main',
+            'kboot = kboot.tool:main',
         ],
     },
-    packages=['kboot', 'kboot_cli'], 
+    packages=['kboot'],
     install_requires = requirements,
     include_package_data = True,
 )

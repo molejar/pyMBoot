@@ -1,4 +1,4 @@
-# Copyright 2015 Martin Olejar
+# Copyright 2016 Martin Olejar
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,35 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from kboot import *
-from srec import SRecFile
-from utils import *
-
+from .srec import SRecFile, SRecError, SRecAlignError, SRecChecksumError, SRecCountError, SRecMarkError, SRecLengthError
+from .ihex import IHexFile, IHexSegment, IHexError, IHexAlignError, IHexChecksumError, IHexCountError, IHexTypeError, \
+                  IHexLengthError
+from .kboot import KBoot, PropEnum, StatEnum, scan_usb, DEFAULT_USB_PID, DEFAULT_USB_VID, \
+                   GenericError, CommandError, DataError, ConnError, TimeOutError
 
 __author__ = 'Martin Olejar <martin.olejar@gmail.com>'
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 __status__ = 'Development'
 
 __all__ = [
+    # const
+    'DEFAULT_USB_PID',
+    'DEFAULT_USB_VID',
+    # global methods
+    'scan_usb',
+    # enums
+    'PropEnum',
+    'StatEnum',
     # classes
     'KBoot',
     'SRecFile',
-
+    'IHexFile',
+    'IHexSegment',
     # exceptions
-    'KBootGenericError',
-    'KBootCommandError',
-    'KBootDataError',
-    'KBootConnectionError',
-    'KBootTimeoutError',
-
-    # enums
-    'Property',
-    'Status',
-
-    #
-    'long_to_array',
-    'string_to_array',
-    'array_to_long',
-    'array_to_string',
+    'GenericError',
+    'CommandError',
+    'DataError',
+    'ConnError',
+    'TimeOutError',
+    # SRec exceptions
+    'SRecError',
+    'SRecAlignError',
+    'SRecChecksumError',
+    'SRecCountError',
+    'SRecMarkError',
+    'SRecLengthError',
+    # IHex exceptions
+    'IHexError',
+    'IHexAlignError',
+    'IHexChecksumError',
+    'IHexCountError',
+    'IHexTypeError',
+    'IHexLengthError'
 ]

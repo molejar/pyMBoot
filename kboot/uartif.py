@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import sys
 import glob
-import logging
-import threading
 import serial
 from time import time
-from utils import *
-from flufl.enum import IntEnum
+from struct import pack, unpack_from
+from .misc import crc16
 
 
-class uartif(object):
+########################################################################################################################
+# UART Interface Class
+########################################################################################################################
+class UARTIF(object):
 
     def __init__(self):
         self.ser = serial.Serial()
@@ -76,7 +75,7 @@ class uartif(object):
 
     def get_supported_baudrates(self):
         if self.ser.isOpen():
-            self.ser.getSupportedBaudrates()
+            pass
 
     def send_ack(self, val=True):
         ack = [0x5A, 0xA1 if val == True else 0xA7]
@@ -87,7 +86,7 @@ class uartif(object):
         if not self.ser.isOpen():
             raise Exception("UART Disconnected")
         # Send Ping
-        self.ser.setTimeout(1)
+        #self.ser.setTimeout(1)
         self.ser.flushInput()
         self.ser.flushOutput()
         self.ser.write(bytearray((0x5A, 0xA6)))
@@ -116,15 +115,16 @@ class uartif(object):
             if ret[0] != 0x5A:
                 raise Exception("Packet Error")
             packet_type = ret[1]
-            dlen = array_to_long(ret[2:])
-            self.ser.setTimeout(5)
+            dlen = unpack_from('<I', ret, 2)[0]
+            #self.ser.setTimeout(5)
             data = self.ser.read(dlen + 2)
             if len(data) < (dlen + 2):
                 raise Exception("Read timed out 2")
-            crc = array_to_long(data[:2])
+            crc = unpack_from('<I', data[:2])[0]
+            #crc = array_to_long(data[:2])
             crc_calc = crc16(data[2:], crc_calc)
             if crc != crc_calc:
-                self.ser.setTimeout(1)
+                #self.ser.setTimeout(1)
                 self.ser.flushInput()
                 self.ser.flushOutput()
                 self.send_ack(False)
@@ -140,10 +140,10 @@ class uartif(object):
             raise Exception("UART Disconnected")
         # Preparing packet
         buf = bytearray([0x5A, packet_type])
-        buf.extend(long_to_array(len(data), 2))
-        buf.extend(long_to_array(crc16(data, crc16(buf)), 2))
+        #buf.extend(long_to_array(len(data), 2))
+        #buf.extend(long_to_array(crc16(data, crc16(buf)), 2))
         buf.extend(data)
-        logging.debug('UART-OUT[0x]: %s', array_to_string(buf))
+        #logging.debug('UART-OUT[0x]: %s', array_to_string(buf))
         repeat_count = 3
         while repeat_count > 0:
             # send packet
@@ -156,7 +156,7 @@ class uartif(object):
                 if ((time() - start) * 1000) > timeout:
                     raise Exception("ACK timed out")
             ret = self.ser.read(2)
-            logging.debug('UART-ACK[0x]: %s', array_to_string(ret))
+            #logging.debug('UART-ACK[0x]: %s', array_to_string(ret))
             repeat_count -= 1
             if ret[0] == 0x5A and ret[1] == 0xA1:
                 return True

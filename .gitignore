@@ -1,3 +1,10 @@
+# directories
 .idea
+*.egg-info
+__pycache__
+build
+dist
+temp
 
+# files
 *.pyc
