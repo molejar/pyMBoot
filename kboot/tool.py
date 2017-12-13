@@ -269,11 +269,11 @@ def info(ctx):
 
 # KBoot MCU memory write command
 @cli.command(short_help="Write data into MCU memory")
-@click.option('-a', '--addr',   type=UINT, default=0, show_default=True, help='Start Address.')
+@click.option('-a', '--address',   type=UINT, default=0, show_default=True, help='Start Address.')
 @click.option('-o', '--offset', type=UINT, default=0, show_default=True, help='Offset of input data.')
 @click.argument('file', nargs=1, type=INFILE)
 @click.pass_context
-def write(ctx, addr, offset, file):
+def write(ctx, address, offset, file):
 
     err_msg = ""
 
@@ -289,8 +289,8 @@ def write(ctx, addr, offset, file):
             raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
         else:
             data = ihex.data
-            if addr == 0:
-                addr = ihex.start_address
+            if address == 0:
+                address = ihex.start_address
     else:
         srec = kboot.SRecFile()
         try:
@@ -299,8 +299,8 @@ def write(ctx, addr, offset, file):
             raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
         else:
             data = srec.data
-            if addr == 0:
-                addr = srec.start_address
+            if address == 0:
+                address = srec.start_address
 
     if offset < len(data):
         data = data[offset:]
@@ -321,7 +321,7 @@ def write(ctx, addr, offset, file):
         flashSectorSize = kb.get_property(kboot.PropEnum.FlashSectorSize)['raw_value']
 
         # Align Erase Start Address and Len to Flash Sector Size
-        saddr = (addr & ~(flashSectorSize - 1))
+        saddr = (address & ~(flashSectorSize - 1))
         slen = (len(data) & ~(flashSectorSize - 1))
         if (len(data) % flashSectorSize) > 0:
             slen += flashSectorSize
@@ -330,7 +330,7 @@ def write(ctx, addr, offset, file):
         kb.flash_erase_region(saddr, slen)
 
         # Write data into MCU Flash memory
-        kb.write_memory(addr, data)
+        kb.write_memory(address, data)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
 
@@ -341,7 +341,7 @@ def write(ctx, addr, offset, file):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
-    click.secho(" Done Successfully. \n")
+    click.secho("\n Wrote Successfully.")
 
 
 # KBoot MCU memory read command
@@ -447,6 +447,8 @@ def erase(ctx, address, length, mass):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
+    click.secho("\n Erased Successfully.")
+
 
 # KBoot MCU unlock command
 @cli.command(short_help="Unlock MCU")
@@ -483,9 +485,11 @@ def unlock(ctx, key):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
+    click.secho("\n Unlocked Successfully.")
+
 
 # KBoot MCU fill memory command
-@cli.command(short_help="Fill MCU memory with specified patern")
+@cli.command(short_help="Fill MCU memory with specified pattern")
 @click.option('-p', '--pattern', type=UINT, default=0xFFFFFFFF, help='Pattern format (default: 0xFFFFFFFF).')
 @click.argument('address', type=UINT)
 @click.argument('length',  type=UINT)
@@ -516,6 +520,8 @@ def fill(ctx, addr, length, pattern):
     if err_msg:
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
+
+    click.secho("\n Filled Successfully.")
 
 
 # KBoot MCU reset command

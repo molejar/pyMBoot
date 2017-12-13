@@ -21,7 +21,7 @@ Dependencies
 Installation
 ------------
 
-To install the latest version from master branch execute in shell following commands:
+To install the latest version from master branch execute in shell following command:
 
 ``` bash
     $ pip3 install -U https://github.com/molejar/pyKBoot/archive/master.zip
@@ -59,7 +59,12 @@ The following example is showing how to use `kboot` module in your code.
 
             info = kb.get_mcu_info() # Get MCU info (All KBoot parameters)
             for key, value in info.items():
-                print(" %-20s = 0x%08X (%s)" % (key, value['raw_value'], value['string']))
+                m = " {}:".format(key)
+                if isinstance(value['string'], list):
+                    m += "".join(["\n  - {}".format(s) for s in value['string']])
+                else:
+                    m += "\n  = {}".format(value['string'])
+                print(m)
             
             # Read MCU memory: 100 bytes from address 0
             data = kb.read_memory(start_address=0, length=100)
@@ -67,13 +72,13 @@ The following example is showing how to use `kboot` module in your code.
             ... # other commands
 
             kb.close()
-    except Exception as e:              # Handle exception
+    except Exception as e:     # Handle exception
         print(str(e))
 
 ```
 
 [ kboot ] Tool
-----------------
+--------------
 
 pyKBoot is distributed with command-line utility `kboot`, which presents the complete functionality of this library. 
 If you write `kboot` into shell and click enter, then you get the description of its usage. For getting the help of 
@@ -105,52 +110,168 @@ individual commands just use `kboot <command name> -?`.
       write   Write data into MCU memory
 ```
 
-####$ info command
+<br>
+
+#### $ kboot info
+
+Read kboot properties fro connected MCU.
 
 ``` bash
-   $ kboot info
-   
-     CurrentVersion:
-      = 1.0.0
-     AvailablePeripherals:
-      - UART
-      - I2C-Slave
-      - SPI-Slave
-      - USB-HID
-     FlashStartAddress:
-      = 0x00000000
-     FlashSize:
-      = 256kB
-     FlashSectorSize:
-      = 1kB
-     FlashBlockCount:
-      = 2
-     AvailableCommands:
-      - FlashEraseAll
-      - FlashEraseRegion
-      - ReadMemory
-      - FillMemory
-      - FlashSecurityDisable
-      - ReceiveSBFile
-      - Call
-      - Reset
-      - SetProperty
-     VerifyWrites:
-      = 1
-     MaxPacketSize:
-      = 32B
-     ReservedRegions:
-      = 0
-     ValidateRegions:
-      = 1
-     RAMStartAddress:
-      = 0x1FFFE000
-     RAMSize:
-      = 32kB
-     SystemDeviceIdent:
-      = 0x23161D82
-     FlashSecurityState:
-      = Unlocked
+ $ kboot info
+
+ CurrentVersion:
+  = 1.0.0
+ AvailablePeripherals:
+  - UART
+  - I2C-Slave
+  - SPI-Slave
+  - USB-HID
+ FlashStartAddress:
+  = 0x00000000
+ FlashSize:
+  = 256kB
+ FlashSectorSize:
+  = 1kB
+ FlashBlockCount:
+  = 2
+ AvailableCommands:
+  - FlashEraseAll
+  - FlashEraseRegion
+  - ReadMemory
+  - FillMemory
+  - FlashSecurityDisable
+  - ReceiveSBFile
+  - Call
+  - Reset
+  - SetProperty
+ VerifyWrites:
+  = 1
+ MaxPacketSize:
+  = 32B
+ ReservedRegions:
+  = 0
+ ValidateRegions:
+  = 1
+ RAMStartAddress:
+  = 0x1FFFE000
+ RAMSize:
+  = 32kB
+ SystemDeviceIdent:
+  = 0x23161D82
+ FlashSecurityState:
+  = Unlocked
+```
+
+<br>
+
+#### $ kboot read [OPTIONS] ADDRESS LENGTH
+
+Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.hex) or s-record (*.srec or *.s19) 
+format. If output file is not specified, the data are dumped into stdout. 
+
+##### options:
+* **-c, --compress** - Compress dump output. (default: False)
+* **-f, --file** -  Output file name with extension: *.bin, *.hex, *.srec or *.s19
+* **-?, --help** - Show help message and exit.
+
+``` bash
+ $ kboot read 0 200                                                                                                                                                    
+
+ Reading from MCU memory, please wait !
+
+  ADDRESS | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | 0123456789ABCDEF
+ -----------------------------------------------------------------------------
+ 00000000 | 00 60 00 20 C1 00 00 00 D9 08 00 00 09 01 00 00 | .`. ............
+ 00000010 | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 | ................
+ 00000020 | 00 00 00 00 00 00 00 00 00 00 00 00 09 01 00 00 | ................
+ 00000030 | 00 00 00 00 00 00 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000040 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000050 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000060 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000070 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000080 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 00000090 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 000000A0 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 000000B0 | 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 | ................
+ 000000C0 | 0A 49 0B 4A 0B 4B 9B 1A                         | .I.J.K..
+ -----------------------------------------------------------------------------
+```
+
+<br>
+
+#### $ kboot write [OPTIONS] FILE
+
+Write data from attached FILE into MCU memory.
+
+##### options:
+* **-a, --address** - Start Address. (default: 0)
+* **-o, --offset** - Offset of input data. (default: 0)
+* **-?, --help** - Show help message and exit.
+
+``` bash
+ $ kboot write blink.srec
+
+ Wrote Successfully.
+```
+
+<br>
+
+#### $ kboot erase [OPTIONS]
+
+Erase MCU memory from specified address and length or complete chip. 
+
+##### options:
+* **-m, --mass** - Erase complete MCU memory.
+* **-a, --address** - Start Address.
+* **-l, --length** - Count of bytes aligned to flash block size.
+* **-?, --help** - Show help message and exit.
+
+``` bash
+ $ kboot erase -m
+
+ Chip Erased Successfully.
+```
+
+<br>
+
+#### $ kboot unlock [OPTIONS]
+
+Unlock MCU memory. 
+
+##### options:
+* **-k, --key** - Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08
+* **-?, --help** - Show help message and exit.
+
+``` bash
+ $ kboot unlock
+
+ Chip Unlocked Successfully.
+```
+
+<br>
+
+#### $ kboot fill [OPTIONS] ADDRESS LENGTH
+
+Fill MCU memory with specified pattern
+
+##### options:
+* **-p, --pattern** - Pattern format (default: 0xFFFFFFFF).
+* **-?, --help** - Show help message and exit.
+
+``` bash
+ $ kboot fill -p 0x11111111 0x1FFFE000 10
+
+ Filled Successfully.
+```
+
+<br>
+
+#### $ kboot reset
+
+MCU SW reset
+
+``` bash
+ $ kboot reset
 ```
 
 TODO
