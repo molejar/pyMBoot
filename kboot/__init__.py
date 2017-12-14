@@ -16,7 +16,7 @@ from .srec import SRecFile, SRecError, SRecAlignError, SRecChecksumError, SRecCo
 from .ihex import IHexFile, IHexSegment, IHexError, IHexAlignError, IHexChecksumError, IHexCountError, IHexTypeError, \
                   IHexLengthError
 from .kboot import KBoot, PropEnum, StatEnum, scan_usb, DEFAULT_USB_PID, DEFAULT_USB_VID, \
-                   GenericError, CommandError, DataError, ConnError, TimeOutError
+                   GenericError, CommandError, DataError, ConnError, TimeOutError, atos
 
 __author__ = 'Martin Olejar <martin.olejar@gmail.com>'
 __version__ = '0.1.4'
@@ -27,6 +27,7 @@ __all__ = [
     'DEFAULT_USB_PID',
     'DEFAULT_USB_VID',
     # global methods
+    'atos',
     'scan_usb',
     # enums
     'PropEnum',

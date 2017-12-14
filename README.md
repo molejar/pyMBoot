@@ -164,10 +164,12 @@ Read kboot properties fro connected MCU.
 
 <br>
 
-#### $ kboot read [OPTIONS] ADDRESS LENGTH
+#### $ kboot read [OPTIONS] ADDRESS [LENGTH]
 
 Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.hex) or s-record (*.srec or *.s19) 
 format. If output file is not specified, the data are dumped into stdout. 
+
+> LENGTH argument is optional and as default will be used the size to end of memory
 
 ##### options:
 * **-c, --compress** - Compress dump output. (default: False)
@@ -175,8 +177,8 @@ format. If output file is not specified, the data are dumped into stdout.
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot read 0 200                                                                                                                                                    
-
+ $ kboot read 0 200
+ 
  Reading from MCU memory, please wait !
 
   ADDRESS | 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F | 0123456789ABCDEF

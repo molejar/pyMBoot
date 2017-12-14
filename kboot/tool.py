@@ -208,6 +208,8 @@ def cli(ctx, vid, pid, debug):
     ctx.obj['DEBUG'] = debug
     ctx.obj['DEVICE'] = None
 
+    click.echo()
+
     devs = kboot.scan_usb(vid, pid)
     if devs:
         index = 0
@@ -218,8 +220,8 @@ def cli(ctx, vid, pid, debug):
                 click.secho(" {}) {}".format(i, dev.getInfo()))
                 i += 1
             click.echo('\n Select: ', nl=False)
-            c = click.getchar(True)
-            click.echo('')
+            c = click.getchar()
+            click.secho('{}\n'.format(c))
             index = int(c, 10)
 
         ctx.obj['DEVICE'] = devs[index]
@@ -235,7 +237,7 @@ def info(ctx):
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -247,7 +249,7 @@ def info(ctx):
         # Get MCU info
         nfo = kb.get_mcu_info()
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot device
     kb.close()
@@ -256,15 +258,17 @@ def info(ctx):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
+    if ctx.obj['DEBUG']:
+        click.echo()
+
     # Print KBoot MCU Info
-    click.echo()
     for key, value in nfo.items():
         m = " {}:".format(key)
         if isinstance(value['string'], list):
             m += "".join(["\n  - {}".format(s) for s in value['string']])
         else:
             m += "\n  = {}".format(value['string'])
-        click.secho(m)
+        click.echo(m)
 
 
 # KBoot MCU memory write command
@@ -305,10 +309,10 @@ def write(ctx, address, offset, file):
     if offset < len(data):
         data = data[offset:]
 
-    click.echo('\n Writing into MCU memory, please wait !\n')
+    click.echo(' Writing into MCU memory, please wait !\n')
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo("\n ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -341,7 +345,10 @@ def write(ctx, address, offset, file):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
-    click.secho("\n Wrote Successfully.")
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    click.echo(" Wrote Successfully.")
 
 
 # KBoot MCU memory read command
@@ -349,7 +356,7 @@ def write(ctx, address, offset, file):
 @click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
 @click.option('-f', '--file', type=OUTFILE, help='Output file name with extension: *.bin, *.hex, *.srec or *.s19')
 @click.argument('address', type=UINT)
-@click.argument('length',  type=UINT)
+@click.argument('length',  type=UINT, required=False)
 @click.pass_context
 def read(ctx, address, length, compress, file):
 
@@ -357,7 +364,7 @@ def read(ctx, address, length, compress, file):
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -366,12 +373,17 @@ def read(ctx, address, length, compress, file):
     try:
         # Connect KBoot USB device
         kb.open_usb(ctx.obj['DEVICE'])
-
-        click.echo("\n Reading from MCU memory, please wait !\n")
+        if ctx.obj['DEBUG']: click.echo()
+        if length is None:
+            size = kb.get_property(kboot.PropEnum.FlashSize)['raw_value']
+            if address > (size - 1):
+                raise Exception("LENGTH argument is required for non FLASH access !")
+            length = size - address
+        click.echo(" Reading from MCU memory, please wait ! \n")
         # Call KBoot flash erase all function
         data = kb.read_memory(address, length)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot Device
     kb.close()
@@ -381,6 +393,7 @@ def read(ctx, address, length, compress, file):
         sys.exit(ERROR_CODE)
 
     if file is None:
+        if ctx.obj['DEBUG']: click.echo()
         click.echo(hexdump(data, address, compress))
     else:
         if file.lower().endswith('.bin'):
@@ -404,7 +417,7 @@ def read(ctx, address, length, compress, file):
             except Exception as e:
                 raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
 
-        click.secho(" Successfully saved into: {}".format(file))
+        click.echo("\n Successfully saved into: {}".format(file))
 
 
 # KBoot MCU memory erase command
@@ -418,7 +431,7 @@ def erase(ctx, address, length, mass):
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -438,7 +451,7 @@ def erase(ctx, address, length, mass):
             # Call KBoot flash erase region function
             kb.flash_erase_region(address, length)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot Device
     kb.close()
@@ -447,7 +460,10 @@ def erase(ctx, address, length, mass):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
-    click.secho("\n Erased Successfully.")
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    click.secho(" Erased Successfully.")
 
 
 # KBoot MCU unlock command
@@ -459,7 +475,7 @@ def unlock(ctx, key):
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -476,7 +492,7 @@ def unlock(ctx, key):
             # Call KBoot flash security disable function
             kb.flash_security_disable(key)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot Device
     kb.close()
@@ -485,7 +501,10 @@ def unlock(ctx, key):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
-    click.secho("\n Unlocked Successfully.")
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    click.echo(" Unlocked Successfully.")
 
 
 # KBoot MCU fill memory command
@@ -494,12 +513,12 @@ def unlock(ctx, key):
 @click.argument('address', type=UINT)
 @click.argument('length',  type=UINT)
 @click.pass_context
-def fill(ctx, addr, length, pattern):
+def fill(ctx, address, length, pattern):
 
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -510,9 +529,9 @@ def fill(ctx, addr, length, pattern):
         kb.open_usb(ctx.obj['DEVICE'])
 
         # Call KBoot fill memory function
-        kb.fill_memory(addr, length, pattern)
+        kb.fill_memory(address, length, pattern)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot Device
     kb.close()
@@ -521,7 +540,10 @@ def fill(ctx, addr, length, pattern):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
-    click.secho("\n Filled Successfully.")
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    click.secho(" Filled Successfully.")
 
 
 # KBoot MCU reset command
@@ -532,7 +554,7 @@ def reset(ctx):
     err_msg = ""
 
     if ctx.obj['DEVICE'] is None:
-        click.echo("\n - No MCU with KBoot detected !")
+        click.echo(" ERROR: No MCU with KBoot detected !")
         sys.exit(ERROR_CODE)
 
     # Create KBoot instance
@@ -545,7 +567,7 @@ def reset(ctx):
         # Call KBoot MCU reset function
         kb.reset()
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
+        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
     # Disconnect KBoot Device
     kb.close()
@@ -554,6 +576,10 @@ def reset(ctx):
         click.echo(err_msg)
         sys.exit(ERROR_CODE)
 
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    click.secho(" Reset OK")
 
 def main():
     cli(obj={})

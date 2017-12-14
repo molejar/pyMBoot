@@ -483,7 +483,7 @@ class KBoot(object):
         """ KBoot: Get value of specified property
         :param prop_tag: The property ID (see Property enumerator)
         :param ext_mem_identifier:
-        :return {dict} with 'RAW' and 'STRING' value
+        :return {dict} with 'RAW' and 'STRING/LIST' value
         """
         prop_tag = int(prop_tag)
         logging.info('TX-CMD: GetProperty->%s', PropEnum(prop_tag).name)
