@@ -43,7 +43,7 @@ class UsbHidBase(object):
     def _decode_packet(self, raw_data):
         report_id, _, plen = unpack_from('<BBH', raw_data)
         data = raw_data[4:4 + plen]
-        return (report_id, data)
+        return report_id, data
 
     def open(self):
         raise NotImplementedError()
@@ -83,7 +83,7 @@ if os.name == "nt":
             self.report = []
             # deque used here instead of synchronized Queue
             # since read speeds are ~10-30% faster and are
-            # comprable to a based list implmentation.
+            # comparable to a based list implementation.
             self.rcv_data = collections.deque()
             self.device = None
             return
@@ -123,7 +123,7 @@ if os.name == "nt":
                     raise Exception("Read timed out")
             rawdata = self.rcv_data.popleft()
             logging.debug('USB-IN [0x]: %s', atos(rawdata))
-            return self._decode_packet(rawdata)
+            return self._decode_packet(bytes(rawdata))
 
         @staticmethod
         def enumerate(vid, pid):
