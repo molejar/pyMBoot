@@ -1,60 +1,64 @@
 #!/usr/bin/env python
 
-# Copyright 2015 Martin Olejar
+# Copyright (c) 2019 Martin Olejar
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: BSD-3-Clause
+# The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
+# or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
-import sys
-import kboot
+from os import path
+from setuptools import setup
+from kboot import __version__, __license__, __author__, __contact__
 
-from setuptools import setup, find_packages
 
-requirements = ['click>=6.0', 'pyserial>=3.0']
+def long_description():
+    try:
+        import pypandoc
 
-if sys.platform.startswith('linux'):
-    requirements.append('pyusb>=1.0.0b2')
-elif sys.platform.startswith('win'):
-    requirements.append('pywinusb>=0.4.0')
-else:
-    raise Exception('Not supported platform !')
+        readme_path = path.join(path.dirname(__file__), 'README.md')
+        return pypandoc.convert(readme_path, 'rst').replace('\r', '')
+    except (IOError, ImportError):
+        return (
+            "More on: https://github.com/molejar/pyKBoot"
+        )
 
 setup(
     name='kboot',
-    version=kboot.__version__,
-    description='Python module for Kinetis Bootloader',
-    author='Martin Olejar',
-    author_email='martin.olejar@gmail.com',
-    keywords="Kinetis bootloader",
+    version=__version__,
+    license=__license__,
+    author=__author__,
+    author_email=__contact__,
     url="https://github.com/molejar/pyKBoot",
-    license="Apache 2.0",
-    platforms = "Mac OS X, Windows, Linux",
-    classifiers = [
-        'Programming Language :: Python',
-        'Development Status :: 3 - Alpha',
+    description='Python module for Kinetis Bootloader',
+    long_description=long_description(),
+    keywords="Kinetis bootloader",
+    platforms="Windows, Linux",
+    python_requires=">=3.5",
+    setup_requires=[
+        'setuptools>=40.0'
+    ],
+    install_requires=[
+        'click>=6.0',
+        'pyserial>=3.0',
+        'bincopy>=16.0.0',
+        'easy_enum>=0.1.0',
+        'pyusb>=1.0.0b2;platform_system!="Windows"',
+        'pywinusb>=0.4.0;platform_system=="Windows"'
+    ],
+    classifiers=[
+        'Programming Language :: Python :: 3',
+        'Operating System :: POSIX :: Linux',
+        'Operating System :: Microsoft :: Windows',
         'Environment :: Console',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: OS Independent',
+        'License :: OSI Approved :: BSD License',
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Embedded Systems',
         'Topic :: Utilities',
     ],
-    entry_points = {
-        'console_scripts': [
-            'kboot = kboot.tool:main',
-        ],
-    },
     packages=['kboot'],
-    install_requires = requirements,
-    include_package_data = True,
+    entry_points={
+        'console_scripts': [
+            'kboot = kboot.__main__:main',
+        ],
+    }
 )

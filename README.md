@@ -24,7 +24,7 @@ Installation
 To install the latest version from master branch execute in shell following command:
 
 ``` bash
-    $ pip3 install -U https://github.com/molejar/pyKBoot/archive/master.zip
+    $ pip install -U https://github.com/molejar/pyKBoot/archive/master.zip
 ```
 
 In case of development, install it from cloned sources:
@@ -32,12 +32,12 @@ In case of development, install it from cloned sources:
 ``` bash
     $ git clone https://github.com/molejar/pyKBoot.git
     $ cd pyKBoot
-    $ pip3 install -U -e .
+    $ pip install -U -e .
 ```
 
 **NOTE:** You may run into a permissions issues running these commands. Here are a few options how to fix it:
 
-1. Run with `sudo` to install pyIMX and dependencies globally
+1. Run with `sudo` to install pyKBoot and dependencies globally
 2. Specify the `--user` option to install locally into your home directory (export "~/.local/bin" into PATH variable if haven't).
 3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
 
@@ -89,13 +89,12 @@ individual commands just use `kboot <command name> -?`.
   
     Usage: kboot [OPTIONS] COMMAND [ARGS]...
     
-      Kinetis Bootloader Command Line Interface, version: 0.1.4
+      Kinetis Bootloader Command Line Interface, version: 0.2.0
       
       NOTE: Development version, be carefully with it usage !
       
     Options:
-      --vid UNSIGNED INT         USB Vendor  ID (default: 0x15A2)
-      --pid UNSIGNED INT         USB Product ID (default: 0x0073)
+      -t, --target TEXT          Select target MKL27, LPC55, ... [optional]
       -d, --debug INTEGER RANGE  Debug level: 0-off, 1-info, 2-debug
       -v, --version              Show the version and exit.
       -?, --help                 Show this message and exit.
@@ -114,10 +113,12 @@ individual commands just use `kboot <command name> -?`.
 
 #### $ kboot info
 
-Read kboot properties fro connected MCU.
+Read kboot properties from connected MCU.
 
 ``` bash
  $ kboot info
+
+ DEVICE: Kinetis Bootloader (0x15A2, 0x0073)
 
  CurrentVersion:
   = 1.0.0

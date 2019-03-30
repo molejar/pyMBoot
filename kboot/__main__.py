@@ -1,21 +1,16 @@
-# Copyright 2016 Martin Olejar
+#!/usr/bin/env python
+
+# Copyright (c) 2019 Martin Olejar
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: BSD-3-Clause
+# The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
+# or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 import os
 import sys
 import click
 import kboot
+import bincopy
 import traceback
 
 
@@ -189,42 +184,51 @@ DESCRIP = (
 )
 
 
+# helper method
+def scan_usb(device_name):
+    # Scan for connected devices
+
+    fsls = kboot.scan_usb(device_name)
+
+    if fsls:
+        index = 0
+
+        if len(fsls) > 1:
+            i = 0
+            click.echo('')
+            for fsl in fsls:
+                click.secho(" %d) %s" % (i, fsl.getInfo()))
+                i += 1
+            click.echo('\n Select: ', nl=False)
+            c = input()
+            click.echo()
+            index = int(c, 10)
+
+        click.secho(" DEVICE: %s\n" % fsls[index].getInfo())
+        return fsls[index]
+
+    else:
+        click.echo("\n - Target not detected !")
+        sys.exit(ERROR_CODE)
+
+
 # KBoot base options
 @click.group(context_settings=dict(help_option_names=['-?', '--help']), help=DESCRIP)
-@click.option("--vid", type=UINT, default=kboot.DEFAULT_USB_VID,
-              help='USB Vendor  ID (default: 0x{:04X})'.format(kboot.DEFAULT_USB_VID))
-@click.option("--pid", type=UINT, default=kboot.DEFAULT_USB_PID,
-              help='USB Product ID (default: 0x{:04X})'.format(kboot.DEFAULT_USB_PID))
+@click.option('-t', '--target', type=click.STRING, default=None, help='Select target MKL27, LPC55, ... [optional]')
 @click.option('-d', "--debug", type=click.IntRange(0, 2, True), default=0, help='Debug level: 0-off, 1-info, 2-debug')
 @click.version_option(VERSION, '-v', '--version')
 @click.pass_context
-def cli(ctx, vid, pid, debug):
+def cli(ctx, target, debug):
 
     if debug > 0:
         import logging
-        loglevel = [logging.NOTSET, logging.INFO, logging.DEBUG]
-        logging.basicConfig(level=loglevel[debug])
+        log_level = [logging.NOTSET, logging.INFO, logging.DEBUG]
+        logging.basicConfig(level=log_level[debug])
 
     ctx.obj['DEBUG'] = debug
-    ctx.obj['DEVICE'] = None
+    ctx.obj['TARGET'] = target
 
     click.echo()
-
-    devs = kboot.scan_usb(vid, pid)
-    if devs:
-        index = 0
-        if len(devs) > 1:
-            i = 0
-            click.echo('')
-            for dev in devs:
-                click.secho(" {}) {}".format(i, dev.getInfo()))
-                i += 1
-            click.echo('\n Select: ', nl=False)
-            c = click.getchar()
-            click.secho('{}\n'.format(c))
-            index = int(c, 10)
-
-        ctx.obj['DEVICE'] = devs[index]
 
 
 # KBoot MCU Info Command
@@ -236,16 +240,15 @@ def info(ctx):
     nfo = []
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
         # Get MCU info
         nfo = kb.get_mcu_info()
     except Exception as e:
@@ -280,55 +283,45 @@ def info(ctx):
 def write(ctx, address, offset, file):
 
     err_msg = ""
+    in_data = bincopy.BinFile()
 
-    if file.lower().endswith('.bin'):
-        with open(file, "rb") as f:
-            data = f.read()
-            f.close()
-    elif file.lower().endswith('.hex'):
-        ihex = kboot.IHexFile()
-        try:
-            ihex.open(file)
-        except Exception as e:
-            raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
+    try:
+        if file.lower().endswith('.bin'):
+            in_data.add_binary_file(file)
+        elif file.lower().endswith('.hex'):
+            in_data.add_ihex_file(file)
         else:
-            data = ihex.data
-            if address == 0:
-                address = ihex.start_address
-    else:
-        srec = kboot.SRecFile()
-        try:
-            srec.open(file)
-        except Exception as e:
-            raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
-        else:
-            data = srec.data
-            if address == 0:
-                address = srec.start_address
+            in_data.add_srec_file(file)
+    except Exception as e:
+        raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
+
+    data = in_data.as_binary()
+
+    if address == 0:
+        address = in_data.execution_start_address
 
     if offset < len(data):
         data = data[offset:]
 
-    click.echo(' Writing into MCU memory, please wait !\n')
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo("\n ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    click.echo(' Writing into MCU memory, please wait !\n')
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flashSectorSize = kb.get_property(kboot.PropEnum.FlashSectorSize)['raw_value']
+        flash_sector_size = kb.get_property(kboot.EnumProperty.FLASH_SECTOR_SIZE)['raw_value']
 
         # Align Erase Start Address and Len to Flash Sector Size
-        saddr = (address & ~(flashSectorSize - 1))
-        slen = (len(data) & ~(flashSectorSize - 1))
-        if (len(data) % flashSectorSize) > 0:
-            slen += flashSectorSize
+        saddr = (address & ~(flash_sector_size - 1))
+        slen = (len(data) & ~(flash_sector_size - 1))
+        if (len(data) % flash_sector_size) > 0:
+            slen += flash_sector_size
 
         # Erase specified region in MCU Flash memory
         kb.flash_erase_region(saddr, slen)
@@ -363,19 +356,18 @@ def read(ctx, address, length, compress, file):
     data = None
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = kb.get_property(kboot.PropEnum.FlashSize)['raw_value']
+            size = kb.get_property(kboot.EnumProperty.FLASH_SIZE)['raw_value']
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
@@ -396,33 +388,30 @@ def read(ctx, address, length, compress, file):
         if ctx.obj['DEBUG']: click.echo()
         click.echo(hexdump(data, address, compress))
     else:
-        if file.lower().endswith('.bin'):
-            with open(file, "wb") as f:
-                f.write(data)
-                f.close()
-        elif file.lower().endswith('.hex'):
-            ihex = kboot.IHexFile()
-            ihex.append(kboot.IHexSegment(address, data))
-            try:
-                ihex.save(file)
-            except Exception as e:
-                raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
-        else:
-            srec = kboot.SRecFile()
-            srec.header = "pyKBoot"
-            srec.start_address = address
-            srec.data = data
-            try:
-                srec.save(file)
-            except Exception as e:
-                raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
+        try:
+            if file.lower().endswith('.bin'):
+                with open(file, "wb") as f:
+                    f.write(data)
+            elif file.lower().endswith('.hex'):
+                ihex = bincopy.BinFile()
+                ihex.add_binary(data, address)
+                with open(file, "w") as f:
+                    f.write(ihex.as_ihex())
+            else:
+                srec = bincopy.BinFile()
+                srec.add_binary(data, address)
+                srec.header = 'pyKBoot'
+                with open(file, "w") as f:
+                    f.write(srec.as_srec())
+        except Exception as e:
+            raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
 
         click.echo("\n Successfully saved into: {}".format(file))
 
 
 # KBoot MCU memory erase command
 @cli.command(short_help="Erase MCU memory")
-@click.option('-m', '--mass', type=click.BOOL, default=False, help='Erase complete MCU memory.')
+@click.option('-m/', '--mass/', is_flag=True, default=False, help='Erase complete MCU memory.')
 @click.option('-a', '--address', type=UINT, help='Start Address.')
 @click.option('-l', '--length',  type=UINT, help='Count of bytes aligned to flash block size.')
 @click.pass_context
@@ -430,9 +419,8 @@ def erase(ctx, address, length, mass):
 
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
@@ -440,14 +428,21 @@ def erase(ctx, address, length, mass):
     try:
         if mass:
             # Connect KBoot USB device
-            kb.open_usb(ctx.obj['DEVICE'])
+            kb.open_usb(hid_dev)
+            # Get available commands
+            commands = kb.get_property(kboot.EnumProperty.AVAILABLE_COMMANDS)
             # Call KBoot flash erase all function
-            kb.flash_erase_all_unsecure()
+            if 'FlashEraseAllUnsecure' in commands['string']:
+                kb.flash_erase_all_unsecure()
+            elif 'FlashEraseAll' in commands['string']:
+                kb.flash_erase_all()
+            else:
+                raise Exception('Not Supported Command')
         else:
             if address is None or length is None:
                 raise Exception("Argument \"-a, --address\" and \"-l, --length\" must be defined !")
             # Connect KBoot USB device
-            kb.open_usb(ctx.obj['DEVICE'])
+            kb.open_usb(hid_dev)
             # Call KBoot flash erase region function
             kb.flash_erase_region(address, length)
     except Exception as e:
@@ -474,16 +469,15 @@ def unlock(ctx, key):
 
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
 
         if key is None:
             # Call KBoot flash erase all and unsecure function
@@ -517,16 +511,15 @@ def fill(ctx, address, length, pattern):
 
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
 
         # Call KBoot fill memory function
         kb.fill_memory(address, length, pattern)
@@ -553,16 +546,15 @@ def reset(ctx):
 
     err_msg = ""
 
-    if ctx.obj['DEVICE'] is None:
-        click.echo(" ERROR: No MCU with KBoot detected !")
-        sys.exit(ERROR_CODE)
+    # Scan USB
+    hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
     kb = kboot.KBoot()
 
     try:
         # Connect KBoot USB device
-        kb.open_usb(ctx.obj['DEVICE'])
+        kb.open_usb(hid_dev)
 
         # Call KBoot MCU reset function
         kb.reset()
@@ -581,5 +573,10 @@ def reset(ctx):
 
     click.secho(" Reset OK")
 
+
 def main():
     cli(obj={})
+
+
+if __name__ == '__main__':
+    main()

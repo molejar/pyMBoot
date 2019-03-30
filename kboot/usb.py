@@ -1,16 +1,8 @@
-# Copyright 2015 Martin Olejar
+# Copyright (c) 2019 Martin Olejar
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: BSD-3-Clause
+# The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
+# or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 import os
 import logging
@@ -71,7 +63,7 @@ if os.name == "nt":
         raise Exception("PyWinUSB is required on a Windows Machine")
 
 
-    class USBIF(UsbHidBase):
+    class RawHid(UsbHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pywinusb:
@@ -104,12 +96,16 @@ if os.name == "nt":
             logging.debug("Closing USB interface")
             self.device.close()
 
-        def write(self, id, data, size=36):
+        def write(self, id, data, size=None):
             """
             write data on the OUT endpoint associated to the HID interface
+
             """
+            if size is None:
+                size = self.report[id - 1]._HidReport__raw_report_size
+
             rawdata = self._encode_packet(id, data, size)
-            logging.debug('USB-OUT[0x]: %s', atos(rawdata))
+            logging.debug('USB-OUT[%d]: %s', size, atos(rawdata))
             self.report[id - 1].send(rawdata)
 
         def read(self, timeout=2000):
@@ -122,7 +118,7 @@ if os.name == "nt":
                 if ((time() - start) * 1000) > timeout:
                     raise Exception("Read timed out")
             rawdata = self.rcv_data.popleft()
-            logging.debug('USB-IN [0x]: %s', atos(rawdata))
+            logging.debug('USB-IN [%d]: %s', len(rawdata), atos(rawdata))
             return self._decode_packet(bytes(rawdata))
 
         @staticmethod
@@ -149,7 +145,7 @@ if os.name == "nt":
                     dev.close()
 
                     if report:
-                        new_target = USBIF()
+                        new_target = RawHid()
                         new_target.report = report
                         new_target.vendor_name = dev.vendor_name
                         new_target.product_name = dev.product_name
@@ -199,7 +195,8 @@ elif os.name == "posix":
             logging.debug("Close USB Interface")
             self.closed = True
             try:
-                if self.dev: usb.util.dispose_resources(self.dev)
+                if self.dev:
+                    usb.util.dispose_resources(self.dev)
             except:
                 pass
 
@@ -292,7 +289,7 @@ elif os.name == "posix":
                     logging.error('Endpoints not found')
                     return None
 
-                new_target = USBIF()
+                new_target = RawHid()
                 new_target.ep_in = ep_in
                 new_target.ep_out = ep_out
                 new_target.dev = dev
