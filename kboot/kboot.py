@@ -29,9 +29,6 @@ class KBootGenericError(Exception):
         for key, value in kw.items():
             setattr(self, key, value)
 
-        if getattr(self, 'errname', None) is None:
-            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
-
     def __str__(self):
         """ Return the Exception message. """
         if self.msg:
@@ -49,9 +46,21 @@ class KBootGenericError(Exception):
 class KBootCommandError(KBootGenericError):
     _fmt = 'Command operation break -> %(errname)s'
 
+    def __init__(self, msg=None, **kw):
+        super().__init__(msg, **kw)
+
+        if getattr(self, 'errname', None) is None:
+            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
+
 
 class KBootDataError(KBootGenericError):
     _fmt = 'Data %(mode)s break -> %(errname)s'
+
+    def __init__(self, msg=None, **kw):
+        super().__init__(msg, **kw)
+
+        if getattr(self, 'errname', None) is None:
+            setattr(self, 'errname', 'ErrorCode = %d' % self.get_error_value())
 
 
 class KBootConnectionError(KBootGenericError):
@@ -84,12 +93,19 @@ class EnumCommandTag(Enum):
     FLASH_PROGRAM_ONCE = (0x0E, 'FlashProgramOnce', 'Flash Program Once')
     FLASH_READ_ONCE = (0x0F, 'FlashReadOnce', 'Flash Read Once')
     FLASH_READ_RESOURCE = (0x10, 'FlashReadResource', 'Flash Read Resource')
-    CONFIGURE_QUAD_SPI = (0x11, 'ConfigureQuadSpi', 'Configure QuadSPI')
+    CONFIGURE_MEMORY = (0x11, 'ConfigureMemory', 'Configure Quad-SPI Memory')
+    RELIABLE_UPDATE = (0x12, 'ReliableUpdate', 'Reliable Update')
+    GENERATE_KEY_BLOB = (0x13, 'GenerateKeyBlob', 'Generate Key Blob')
+    GENERATE_KEY_BLOB_RESPONSE = (0xb3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
+    KEY_PROVISIONING = (0x15, 'KeyProvisioning', 'Key Provisioning')
+    KEY_PROVISIONING_RESPONSE = (0xb5, 'KeyProvisionResponse', 'Key Provision Response')
+    LOAD_IMAGE = (0x16, 'LoadImage', 'Load Image')
 
 
 class EnumProperty(Enum):
     """ KBoot Property constants """
 
+    LIST_PROPERTIES = (0x00, 'ListProperties', 'List Properties')
     CURRENT_VERSION = (0x01, 'CurrentVersion', 'Current Version')
     AVAILABLE_PERIPHERALS = (0x02, 'AvailablePeripherals', 'Available Peripherals')
     FLASH_START_ADDRESS = (0x03, 'FlashStartAddress', 'Flash Start Address')
@@ -114,6 +130,10 @@ class EnumProperty(Enum):
     QSPI_INIT_STATUS = (0x17, 'QspiInitStatus', 'QuadSPI Initialization Status')
     TARGET_VERSION = (0x18, 'TargetVersion', 'Target Version')
     EXTERNAL_MEMORY_ATTRIBUTES = (0x19, 'ExternalMemoryAttributes', 'External Memory Attributes')
+    RELIABLE_UPDATE_STATUS = (0x1A, 'ReliableUpdateStatus', 'Reliable Update Status')
+    FLASH_PAGE_SIZE = (0x1B, 'FlashPageSize', 'Flash Page Size')
+    IRQ_NOTIFIER_PIN = (0x1C, 'IrqNotifierPin', 'Irq Notifier Pin')
+    PFR_KEYSTORE_UPDATE_OPT = (0x1D, 'PfrKeystoreUpdateOpt', 'PFR Keystore Update Opt')
 
 
 class EnumStatus(Enum):
@@ -124,6 +144,8 @@ class EnumStatus(Enum):
     READ_ONLY = (2, 'ReadOnly', 'Read Only Error')
     OUT_OF_RANGE = (3, 'OutOfRange', 'Out Of Range Error')
     INVALID_ARGUMENT = (4, 'InvalidArgument', 'Invalid Argument Error')
+    TIMEOUT = (5, 'Timeout', 'Timeout Error')
+    NO_TRANSFER_IN_PROGRESS = (6, 'NoTransferInProgress', 'No Transfer In Progress Error')
 
     # Flash driver errors.
     FLASH_SIZE_ERROR = (100, 'FlashSizeError', 'FLASH Driver: Size Error')
@@ -159,6 +181,7 @@ class EnumStatus(Enum):
     PING_ERROR = (10003, 'PingError', 'Ping Error')
     NO_RESPONSE = (10004, 'NoResponse', 'No Response')
     NO_RESPONSE_EXPECTED = (10005, 'NoResponseExpected', 'No Response Expected')
+    UNSUPPORTED_COMMAND = (10006, 'UnsupportedCommand', 'Unsupported Command')
 
     # SB loader errors.
     ROMLDR_SECTION_OVERRUN = (10100, 'RomLdrSectionOverrun', 'ROM Loader: Section Overrun')
@@ -175,6 +198,10 @@ class EnumStatus(Enum):
     ROMLDR_CALL_FAILED = (10111, 'RomLdrCallFailed', 'ROM Loader: Call Failed')
     ROMLDR_KEY_NOT_FOUND = (10112, 'RomLdrKeyNotFound', 'ROM Loader: Key Not Found')
     ROMLDR_SECURE_ONLY = (10113, 'RomLdrSecureOnly', 'ROM Loader: Secure Only')
+    ROMLDR_RESET_RETURNED = (10114, 'RomLdrResetReturned', 'ROM Loader: Reset Returned')
+    ROMLDR_ROLLBACK_BLOCKED = (10115, 'RomLdrRollbackBlocked', 'ROM Loader: Rollback Blocked')
+    ROMLDR_INVALID_SECTION_MAC_COUNT = (10116, 'RomLdrInvalidSectionMacCount', 'ROM Loader: Invalid Section Mac Count')
+    ROMLDR_UNEXPECTED_COMMAND = (10117, 'RomLdrUnexpectedCommand', 'ROM Loader: Unexpected Command')
 
     # Memory interface errors.
     MEMORY_RANGE_INVALID = (10200, 'MemoryRangeInvalid', 'Memory Range Invalid')
@@ -532,6 +559,84 @@ class KBoot(object):
 
         return mcu_info
 
+    def flash_erase_all(self):
+        """ KBoot: Erase complete flash memory without recovering flash security section
+        """
+        logging.info('TX-CMD: FlashEraseAll')
+        # Prepare FlashEraseAll command
+        cmd = pack('4B', EnumCommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00)
+        # Process FlashEraseAll command
+        self._process_cmd(cmd)
+
+    def flash_erase_region(self, start_address, length):
+        """ KBoot: Erase specified range of flash
+        :param start_address: Start address
+        :param length: Count of bytes
+        """
+        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        # Prepare FlashEraseRegion command
+        cmd = pack('<4B2I', EnumCommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
+        # Process FlashEraseRegion command
+        self._process_cmd(cmd, 5000)
+
+    def read_memory(self, start_address, length):
+        """ KBoot: Read data from MCU memory
+        :param start_address: Start address
+        :param length: Count of bytes
+        :return List of bytes
+        """
+        if length == 0:
+            raise ValueError('Data len is zero')
+        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        # Prepare ReadMemory command
+        cmd = pack('<4B2I', EnumCommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
+        # Process ReadMemory command
+        self._process_cmd(cmd)
+        # Process Read Data
+        return self._read_data(length)
+
+    def write_memory(self, start_address, data):
+        """ KBoot: Write data into MCU memory
+        :param start_address: Start address
+        :param data: List of bytes
+        :return Count of wrote bytes
+        """
+        if len(data) == 0:
+            raise ValueError('Data len is zero')
+        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
+        # Prepare WriteMemory command
+        cmd = pack('<4B2I', EnumCommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
+        # Process WriteMemory command
+        self._process_cmd(cmd)
+        # Process Write Data
+        return self._send_data(data)
+
+    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param start_address: Start address (must be word aligned)
+        :param length: Count of words (must be word aligned)
+        :param pattern: Count of wrote bytes
+        """
+        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, pattern)
+        # Prepare FillMemory command
+        cmd = pack('<4B3I', EnumCommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
+        # Process FillMemory command
+        self._process_cmd(cmd)
+
+    def flash_security_disable(self, backdoor_key):
+        """ KBoot: Disable flash security by backdoor key
+        :param backdoor_key:
+        """
+        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
+        # Prepare FlashSecurityDisable command
+        cmd = pack('4B', EnumCommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
+        if len(backdoor_key) < 8:
+            raise ValueError('Short range of backdoor key')
+        cmd += bytes(backdoor_key[3::-1])
+        cmd += bytes(backdoor_key[:3:-1])
+        # Process FlashSecurityDisable command
+        self._process_cmd(cmd)
+
     def get_property(self, prop_tag, ext_mem_identifier=None):
         """ KBoot: Get value of specified property
         :param prop_tag: The property ID (see Property enumerator)
@@ -555,63 +660,61 @@ class KBoot(object):
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
         """
-        prop_tag = int(prop_tag)
         logging.info('TX-CMD: SetProperty->%s = %d', EnumProperty[prop_tag], value)
         # Prepare SetProperty command
         cmd = pack('<4B2I', EnumCommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value)
         # Process SetProperty command
         self._process_cmd(cmd)
 
-    def flash_read_resource(self, start_address, length, option=1):
-        """ KBoot: Read resource of flash module
-        :param start_address:
-        :param length:
-        :param option:
-        :return resource list
+    def receive_sb_file(self, data):
+        """ KBoot: Receive SB file
+        :param  data: SB file data
         """
-        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
-        # Prepare FlashReadResource command
-        cmd = pack('<4B3I', EnumCommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
-        # Process FlashReadResource command
-        pkg = self._process_cmd(cmd)
-        rx_len = self._parse_value(pkg)
-        length = min(length, rx_len)
-        # Process Read Data
-        return self._read_data(length)
+        if len(data) == 0:
+            raise ValueError('Data len is zero')
+        logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
+        # Prepare WriteMemory command
+        cmd = pack('<4BI', EnumCommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
+        # Process WriteMemory command
+        self._process_cmd(cmd)
+        # Process Write Data
+        return self._send_data(data)
 
-    def flash_security_disable(self, backdoor_key):
-        """ KBoot: Disable flash security by backdoor key
-        :param backdoor_key:
+    def execute(self, jump_address, argument, sp_address):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param jump_address: Jump address (must be word aligned)
+        :param argument: Function arguments address
+        :param sp_address: Stack pointer address
         """
-        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
-        # Prepare FlashSecurityDisable command
-        cmd = pack('4B', EnumCommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
-        if len(backdoor_key) < 8:
-            raise ValueError('Short range of backdoor key')
-        cmd += bytes(backdoor_key[3::-1])
-        cmd += bytes(backdoor_key[:3:-1])
-        # Process FlashSecurityDisable command
+        logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument,
+                     sp_address)
+        # Prepare Execute command
+        cmd = pack('<4B3I', EnumCommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
+        # Process Execute command
         self._process_cmd(cmd)
 
-    def flash_erase_region(self, start_address, length):
-        """ KBoot: Erase specified range of flash
-        :param start_address:
-        :param length:
+    def call(self, call_address, argument, sp_address):
+        """ KBoot: Fill MCU memory with specified pattern
+        :param call_address: Call address (must be word aligned)
+        :param argument: Function arguments address
+        :param sp_address: Stack pointer address
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
-        # Prepare FlashEraseRegion command
-        cmd = pack('<4B2I', EnumCommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
-        # Process FlashEraseRegion command
-        self._process_cmd(cmd, 5000)
-
-    def flash_erase_all(self):
-        """ KBoot: Erase complete flash memory without recovering flash security section
-        """
-        logging.info('TX-CMD: FlashEraseAll')
-        # Prepare FlashEraseAll command
-        cmd = pack('4B', EnumCommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00)
-        # Process FlashEraseAll command
+        logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
+        # Prepare Call command
+        cmd = pack('<4B3I', EnumCommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
+        # Process Call command
         self._process_cmd(cmd)
+
+    def reset(self):
+        """ KBoot: Reset MCU """
+        logging.info('TX-CMD: Reset MCU')
+        # Prepare Reset command
+        cmd = pack('4B', EnumCommandTag.RESET, 0x00, 0x00, 0x00)
+        # Process Reset command
+        try:
+            self._process_cmd(cmd)
+        except:
+            pass
 
     def flash_erase_all_unsecure(self):
         """ KBoot: Erase complete flash memory and recover flash security section
@@ -658,90 +761,47 @@ class KBoot(object):
         self._process_cmd(cmd)
         return length
 
-    def read_memory(self, start_address, length):
-        """ KBoot: Read data from MCU memory
-        :param start_address: Start address
-        :param length: Count of bytes
-        :return List of bytes
+    def flash_read_resource(self, start_address, length, option=1):
+        """ KBoot: Read resource of flash module
+        :param start_address:
+        :param length:
+        :param option:
+        :return resource list
         """
-        if length == 0:
-            raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
-        # Prepare ReadMemory command
-        cmd = pack('<4B2I', EnumCommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
-        # Process ReadMemory command
-        self._process_cmd(cmd)
+        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
+        # Prepare FlashReadResource command
+        cmd = pack('<4B3I', EnumCommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
+        # Process FlashReadResource command
+        pkg = self._process_cmd(cmd)
+        rx_len = self._parse_value(pkg)
+        length = min(length, rx_len)
         # Process Read Data
         return self._read_data(length)
 
-    def write_memory(self, start_address, data):
-        """ KBoot: Write data into MCU memory
-        :param start_address: Start address
-        :param data: List of bytes
-        :return Count of wrote bytes
-        """
-        if len(data) == 0:
-            raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
-        # Prepare WriteMemory command
-        cmd = pack('<4B2I', EnumCommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
-        # Process WriteMemory command
-        self._process_cmd(cmd)
-        # Process Write Data
-        return self._send_data(data)
-
-    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
-        """ KBoot: Fill MCU memory with specified pattern
-        :param start_address: Start address (must be word aligned)
-        :param length: Count of words (must be word aligned)
-        :param pattern: Count of wrote bytes
-        """
-        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, pattern)
-        # Prepare FillMemory command
-        cmd = pack('<4B3I', EnumCommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
-        # Process FillMemory command
-        self._process_cmd(cmd)
-
-    def receive_sb_file(self):
+    def configure_memory(self):
         # TODO: Write implementation
-        raise NotImplementedError('Function \"receive_sb_file()\" not implemented yet')
+        raise NotImplementedError('Function \"configure_memory()\" not implemented yet')
 
-    def configure_quad_spi(self):
+    def reliable_update(self):
         # TODO: Write implementation
-        raise NotImplementedError('Function \"configure_quad_spi()\" not implemented yet')
+        raise NotImplementedError('Function \"reliable_update()\" not implemented yet')
 
-    def execute(self, jump_address, argument, sp_address):
-        """ KBoot: Fill MCU memory with specified pattern
-        :param jump_address: Jump address (must be word aligned)
-        :param argument: Function arguments address
-        :param sp_address: Stack pointer address
-        """
-        logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument,
-                     sp_address)
-        # Prepare Execute command
-        cmd = pack('<4B3I', EnumCommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
-        # Process Execute command
-        self._process_cmd(cmd)
+    def generate_key_blob(self):
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"generate_key_blob()\" not implemented yet')
 
-    def call(self, call_address, argument, sp_address):
-        """ KBoot: Fill MCU memory with specified pattern
-        :param call_address: Call address (must be word aligned)
-        :param argument: Function arguments address
-        :param sp_address: Stack pointer address
-        """
-        logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
-        # Prepare Call command
-        cmd = pack('<4B3I', EnumCommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
-        # Process Call command
-        self._process_cmd(cmd)
+    def generate_key_blob_response(self):
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"generate_key_blob_response()\" not implemented yet')
 
-    def reset(self):
-        """ KBoot: Reset MCU """
-        logging.info('TX-CMD: Reset MCU')
-        # Prepare Reset command
-        cmd = pack('4B', EnumCommandTag.RESET, 0x00, 0x00, 0x00)
-        # Process Reset command
-        try:
-            self._process_cmd(cmd)
-        except:
-            pass
+    def key_provisioning(self):
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"key_provisioning()\" not implemented yet')
+
+    def key_provisioning_response(self):
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"key_provisioning_response()\" not implemented yet')
+
+    def load_image(self):
+        # TODO: Write implementation
+        raise NotImplementedError('Function \"load_image()\" not implemented yet')
