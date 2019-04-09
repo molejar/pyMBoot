@@ -11,8 +11,8 @@ from easy_enum import EEnum as Enum
 
 # relative import
 from .misc import atos
-from .uart import UARTIF
-from .usb import RawHid
+from .uart import UART
+from .usb import RawHID
 
 
 ########################################################################################################################
@@ -96,10 +96,14 @@ class EnumCommandTag(Enum):
     CONFIGURE_MEMORY = (0x11, 'ConfigureMemory', 'Configure Quad-SPI Memory')
     RELIABLE_UPDATE = (0x12, 'ReliableUpdate', 'Reliable Update')
     GENERATE_KEY_BLOB = (0x13, 'GenerateKeyBlob', 'Generate Key Blob')
-    GENERATE_KEY_BLOB_RESPONSE = (0xb3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
     KEY_PROVISIONING = (0x15, 'KeyProvisioning', 'Key Provisioning')
-    KEY_PROVISIONING_RESPONSE = (0xb5, 'KeyProvisionResponse', 'Key Provision Response')
     LOAD_IMAGE = (0x16, 'LoadImage', 'Load Image')
+
+    GENERIC_RESPONSE = (0xA0, 'GenericResponse', 'Generic Response')
+    FLASH_READ_ONCE_RESPONSE = (0xAF, 'FlashReadOnceResponse', 'Flash Read Once Response')
+    FLASH_READ_RESOURCE_RESPONSE = (0xB0, 'FlashReadResourceResponse', 'Flash Read Resource Response')
+    GENERATE_KEY_BLOB_RESPONSE = (0xB3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
+    KEY_PROVISIONING_RESPONSE = (0xB5, 'KeyProvisionResponse', 'Key Provision Response')
 
 
 class EnumProperty(Enum):
@@ -240,16 +244,16 @@ def scan_usb(device_name=None):
 
     if device_name is None:
         for name, value in DEVICES.items():
-            devs += RawHid.enumerate(value[0], value[1])
+            devs += RawHID.enumerate(value[0], value[1])
     else:
         if ':' in device_name:
             vid, pid = device_name.split(':')
-            devs = RawHid.enumerate(int(vid, 0), int(pid, 0))
+            devs = RawHID.enumerate(int(vid, 0), int(pid, 0))
         else:
             if device_name in DEVICES:
                 vid = DEVICES[device_name][0]
                 pid = DEVICES[device_name][1]
-                devs = RawHid.enumerate(vid, pid)
+                devs = RawHID.enumerate(vid, pid)
     return devs
 
 
@@ -518,7 +522,7 @@ class KBoot(object):
         """ KBoot: Connect by UART
         """
         if port is not None:
-            self._uart_dev = UARTIF()
+            self._uart_dev = UART()
             self._uart_dev.open(port, baudrate)
             if self._uart_dev.ping():
                 return True
@@ -790,18 +794,11 @@ class KBoot(object):
         # TODO: Write implementation
         raise NotImplementedError('Function \"generate_key_blob()\" not implemented yet')
 
-    def generate_key_blob_response(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"generate_key_blob_response()\" not implemented yet')
-
     def key_provisioning(self):
         # TODO: Write implementation
         raise NotImplementedError('Function \"key_provisioning()\" not implemented yet')
 
-    def key_provisioning_response(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"key_provisioning_response()\" not implemented yet')
-
     def load_image(self):
         # TODO: Write implementation
         raise NotImplementedError('Function \"load_image()\" not implemented yet')
+

@@ -13,9 +13,11 @@ Dependencies
 ------------
 
 - [Python 3.x](https://www.python.org) - The interpreter
-- [Click](http://click.pocoo.org/6) - Python package for creating beautiful command line interface.
-- [PyWinUSB](https://github.com/rene-aguirre/pywinusb) - Python package that simplifies USB-HID communications on Windows OS.
+- [Click](http://click.pocoo.org) - Python package for creating beautiful command line interface.
+- [bincopy](https://github.com/eerimoq/bincopy) - Python package for parsing S-Record, Intel HEX and TI-TXT files.
+- [easy_enum](https://github.com/molejar/pyEnum) - User friendly implementation of documented Enum type for Python language.
 - [PyUSB](https://walac.github.io/pyusb/) - Python package to access USB devices in Linux OS.
+- [PyWinUSB](https://github.com/rene-aguirre/pywinusb) - Python package that simplifies USB-HID communications on Windows OS.
 - [pyserial](https://github.com/pyserial/pyserial) - Python package for communication over Serial port in Linux and Windows OS.
 
 Installation

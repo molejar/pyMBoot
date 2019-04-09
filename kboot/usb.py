@@ -18,7 +18,7 @@ from .misc import atos
 ########################################################################################################################
 # USB HID Interface Base Class
 ########################################################################################################################
-class UsbHidBase(object):
+class RawHidBase(object):
 
     def __init__(self):
         self.vid = 0
@@ -63,7 +63,7 @@ if os.name == "nt":
         raise Exception("PyWinUSB is required on a Windows Machine")
 
 
-    class RawHid(UsbHidBase):
+    class RawHID(RawHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pywinusb:
@@ -145,7 +145,7 @@ if os.name == "nt":
                     dev.close()
 
                     if report:
-                        new_target = RawHid()
+                        new_target = RawHID()
                         new_target.report = report
                         new_target.vendor_name = dev.vendor_name
                         new_target.product_name = dev.product_name
@@ -168,7 +168,7 @@ elif os.name == "posix":
     except:
         raise Exception("PyUSB is required on a Linux Machine")
 
-    class USBIF(UsbHidBase):
+    class USBIF(RawHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pyusb:
@@ -289,7 +289,7 @@ elif os.name == "posix":
                     logging.error('Endpoints not found')
                     return None
 
-                new_target = RawHid()
+                new_target = RawHID()
                 new_target.ep_in = ep_in
                 new_target.ep_out = ep_out
                 new_target.dev = dev

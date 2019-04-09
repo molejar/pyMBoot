@@ -276,7 +276,7 @@ def info(ctx):
 
 # KBoot MCU memory write command
 @cli.command(short_help="Write data into MCU memory")
-@click.option('-a', '--address',   type=UINT, default=0, show_default=True, help='Start Address.')
+@click.option('-a', '--address', type=UINT, default=None, help='Start Address.')
 @click.option('-o', '--offset', type=UINT, default=0, show_default=True, help='Offset of input data.')
 @click.argument('file', nargs=1, type=INFILE)
 @click.pass_context
@@ -286,19 +286,22 @@ def write(ctx, address, offset, file):
     in_data = bincopy.BinFile()
 
     try:
-        if file.lower().endswith('.bin'):
-            in_data.add_binary_file(file)
-        elif file.lower().endswith('.hex'):
-            in_data.add_ihex_file(file)
-        else:
+        if file.lower().endswith(('.srec', '.s19')):
             in_data.add_srec_file(file)
+            if address is None:
+                address = in_data.minimum_address
+        elif file.lower().endswith('.ihex'):
+            in_data.add_ihex_file(file)
+            if address is None:
+                address = in_data.minimum_address
+        else:
+            in_data.add_binary_file(file)
+            if address is None:
+                raise Exception("Argument \"-a, --address\" must be defined !")
     except Exception as e:
         raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
 
     data = in_data.as_binary()
-
-    if address == 0:
-        address = in_data.execution_start_address
 
     if offset < len(data):
         data = data[offset:]
@@ -389,20 +392,20 @@ def read(ctx, address, length, compress, file):
         click.echo(hexdump(data, address, compress))
     else:
         try:
-            if file.lower().endswith('.bin'):
-                with open(file, "wb") as f:
-                    f.write(data)
-            elif file.lower().endswith('.hex'):
+            if file.lower().endswith(('.srec', '.s19')):
+                srec = bincopy.BinFile()
+                srec.add_binary(data, address)
+                srec.header = 'kboot'
+                with open(file, "w") as f:
+                    f.write(srec.as_srec())
+            elif file.lower().endswith('.ihex'):
                 ihex = bincopy.BinFile()
                 ihex.add_binary(data, address)
                 with open(file, "w") as f:
                     f.write(ihex.as_ihex())
             else:
-                srec = bincopy.BinFile()
-                srec.add_binary(data, address)
-                srec.header = 'pyKBoot'
-                with open(file, "w") as f:
-                    f.write(srec.as_srec())
+                with open(file, "wb") as f:
+                    f.write(data)
         except Exception as e:
             raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
 
