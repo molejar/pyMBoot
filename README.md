@@ -52,28 +52,26 @@ The following example is showing how to use `kboot` module in your code.
 
     import kboot
 
-    kb = kboot.KBoot() # Create KBoot instance
+    # Create KBoot instance
+    kb = kboot.KBoot()
 
     try:
-        devs = kboot.scan_usb()    # Get connected MCU's with KBOOT.
-        if devs:
-            kb.open_usb(devs[0])  # Connect to first USB device from all founded
+        # Scan for connected MCU's
+        devs = kboot.scan_usb()
 
-            info = kb.get_mcu_info() # Get MCU info (All KBoot parameters)
-            for key, value in info.items():
-                m = " {}:".format(key)
-                if isinstance(value['string'], list):
-                    m += "".join(["\n  - {}".format(s) for s in value['string']])
-                else:
-                    m += "\n  = {}".format(value['string'])
-                print(m)
-            
+        if devs:
+            # Connect to first USB device from all founded
+            kb.open_usb(devs[0])
+
             # Read MCU memory: 100 bytes from address 0
             data = kb.read_memory(start_address=0, length=100)
 
-            ... # other commands
+            # Other commands
+            ...
 
+            # Close USB port if finish
             kb.close()
+
     except Exception as e:     # Handle exception
         print(str(e))
 
@@ -176,7 +174,7 @@ format. If output file is not specified, the data are dumped into stdout.
 
 ##### options:
 * **-c, --compress** - Compress dump output. (default: False)
-* **-f, --file** -  Output file name with extension: *.bin, *.hex, *.srec or *.s19
+* **-f, --file** -  Output file name with extension: *.bin, *.ihex, *.srec or *.s19
 * **-?, --help** - Show help message and exit.
 
 ``` bash

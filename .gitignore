@@ -1,8 +1,11 @@
 # directories
 .idea
+*.eggs
 *.egg-info
 __pycache__
 build
+venv
+data
 dist
 temp
 

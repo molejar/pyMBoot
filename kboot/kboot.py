@@ -10,7 +10,7 @@ from struct import pack, unpack_from
 from easy_enum import EEnum as Enum
 
 # relative import
-from .misc import atos
+from .misc import atos, size_fmt
 from .uart import UART
 from .usb import RawHID
 
@@ -312,9 +312,7 @@ class KBoot(object):
     def _parse_property(self, prop_tag, packet):
         raw_value = self._parse_value(packet)
         if prop_tag == EnumProperty.CURRENT_VERSION:
-            str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF,
-                                                   (raw_value >> 8) & 0xFF,
-                                                   raw_value & 0xFF)
+            str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
         elif prop_tag == EnumProperty.AVAILABLE_PERIPHERALS:
             str_value = []
             for key, value in self.INTERFACES.items():
@@ -329,10 +327,7 @@ class KBoot(object):
                     str_value.append(name)
         elif prop_tag in (EnumProperty.MAX_PACKET_SIZE, EnumProperty.FLASH_SECTOR_SIZE, EnumProperty.FLASH_SIZE,
                           EnumProperty.RAM_SIZE):
-            if raw_value >= 1024:
-                str_value = '{0:d}kB'.format(raw_value // 1024)
-            else:
-                str_value = '{0:d}B'.format(raw_value)
+            str_value = size_fmt(raw_value)
         elif prop_tag in (EnumProperty.RAM_START_ADDRESS, EnumProperty.FLASH_START_ADDRESS,
                           EnumProperty.SYSTEM_DEVICE_IDENT):
             str_value = '0x{:08X}'.format(raw_value)

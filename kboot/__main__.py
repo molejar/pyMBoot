@@ -290,7 +290,7 @@ def write(ctx, address, offset, file):
             in_data.add_srec_file(file)
             if address is None:
                 address = in_data.minimum_address
-        elif file.lower().endswith('.ihex'):
+        elif file.lower().endswith(('.hex', '.ihex')):
             in_data.add_ihex_file(file)
             if address is None:
                 address = in_data.minimum_address
@@ -398,7 +398,7 @@ def read(ctx, address, length, compress, file):
                 srec.header = 'kboot'
                 with open(file, "w") as f:
                     f.write(srec.as_srec())
-            elif file.lower().endswith('.ihex'):
+            elif file.lower().endswith(('.hex', '.ihex')):
                 ihex = bincopy.BinFile()
                 ihex.add_binary(data, address)
                 with open(file, "w") as f:
