@@ -59,7 +59,12 @@ The following example is showing how to use `kboot` module in your code.
         # Scan for connected MCU's
         devs = kboot.scan_usb()
 
-        if devs:
+        if devs
+            if len(devs) > 1:
+                # Print list of connected devices
+                for i, dev in enumerate(devs):
+                    print("{}) {}".format(i, dev.getInfo()))
+                    
             # Connect to first USB device from all founded
             kb.open_usb(devs[0])
 
@@ -67,12 +72,16 @@ The following example is showing how to use `kboot` module in your code.
             data = kb.read_memory(start_address=0, length=100)
 
             # Other commands
-            ...
+            # ...
 
             # Close USB port if finish
             kb.close()
+            
+        else:
+            print("Connect device to PC !")
 
-    except Exception as e:     # Handle exception
+    # Handle exception
+    except Exception as e:
         print(str(e))
 
 ```
@@ -108,6 +117,8 @@ individual commands just use `kboot <command name> -?`.
       unlock  Unlock MCU
       write   Write data into MCU memory
 ```
+
+> If USB device is not in known devices list, then use `-t or --target` argument and directly specify the device VID:PID. Example: **-t 0x15A2:0x0073**
 
 <br>
 

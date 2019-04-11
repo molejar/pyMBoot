@@ -267,10 +267,10 @@ def info(ctx):
     # Print KBoot MCU Info
     for key, value in nfo.items():
         m = " {}:".format(key)
-        if isinstance(value['string'], list):
-            m += "".join(["\n  - {}".format(s) for s in value['string']])
+        if isinstance(value, list):
+            m += "".join(["\n  - {}".format(s) for s in value])
         else:
-            m += "\n  = {}".format(value['string'])
+            m += "\n  = {}".format(value)
         click.echo(m)
 
 
@@ -435,9 +435,9 @@ def erase(ctx, address, length, mass):
             # Get available commands
             commands = kb.get_property(kboot.EnumProperty.AVAILABLE_COMMANDS)
             # Call KBoot flash erase all function
-            if 'FlashEraseAllUnsecure' in commands['string']:
+            if kboot.is_available_command(kboot.EnumCommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
                 kb.flash_erase_all_unsecure()
-            elif 'FlashEraseAll' in commands['string']:
+            elif kboot.is_available_command(kboot.EnumCommandTag.FLASH_ERASE_ALL, commands):
                 kb.flash_erase_all()
             else:
                 raise Exception('Not Supported Command')
