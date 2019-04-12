@@ -1,17 +1,17 @@
-pyKBoot
+pyMBoot
 =======
 
-[![Build Status](https://travis-ci.org/molejar/pyKBoot.svg?branch=master)](https://travis-ci.org/molejar/pyKBoot)
-[![PyPI Status](https://img.shields.io/pypi/v/kboot.svg)](https://pypi.python.org/pypi/kboot)
-[![Python Version](https://img.shields.io/pypi/pyversions/kboot.svg)](https://www.python.org)
+[![Build Status](https://travis-ci.org/molejar/pyMBoot.svg?branch=master)](https://travis-ci.org/molejar/pyMBoot)
+[![PyPI Status](https://img.shields.io/pypi/v/mboot.svg)](https://pypi.python.org/pypi/mboot)
+[![Python Version](https://img.shields.io/pypi/pyversions/mboot.svg)](https://www.python.org)
 
-pyKBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). Detailed description of KBOOT key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
+pyMBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuboot-mcu-bootloader-for-nxp-microcontrollers:MCUBOOT) (MCU Bootloader). Detailed description of MCUBOOT (KBOOT) key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
 <p align="center">
-  <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
+  <img src="https://github.com/molejar/pyMBoot/blob/master/doc/connection.png?raw=true" alt="MBoot: HW Connection"/>
 </p>
 
-> The pyKBoot project is still in alpha phase. Please, check issues for the ongoing tasks or todo tasks.
+> The pyMBoot project is still in beta phase. Please, check issues for the ongoing tasks or todo tasks.
 
 Dependencies
 ------------
@@ -30,38 +30,38 @@ Installation
 To install the latest version from master branch execute in shell following command:
 
 ``` bash
-    $ pip install -U https://github.com/molejar/pyKBoot/archive/master.zip
+    $ pip install -U https://github.com/molejar/pyMBoot/archive/master.zip
 ```
 
 In case of development, install it from cloned sources:
 
 ``` bash
-    $ git clone https://github.com/molejar/pyKBoot.git
-    $ cd pyKBoot
+    $ git clone https://github.com/molejar/pyMBoot.git
+    $ cd pyMBoot
     $ pip install -U -e .
 ```
 
 **NOTE:** You may run into a permissions issues running these commands. Here are a few options how to fix it:
 
-1. Run with `sudo` to install pyKBoot and dependencies globally
+1. Run with `sudo` to install pyMBoot and dependencies globally
 2. Specify the `--user` option to install locally into your home directory (export "~/.local/bin" into PATH variable if haven't).
 3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
 
 Usage
 -----
 
-The following example is showing how to use `kboot` module in your code.
+The following example is showing how to use `mboot` module in your code.
 
 ``` python
 
-    import kboot
+    import mboot
 
-    # Create KBoot instance
-    kb = kboot.KBoot()
+    # Create mboot instance
+    mb = mboot.McuBoot()
 
     try:
         # Scan for connected MCU's
-        devs = kboot.scan_usb()
+        devs = mboot.scan_usb()
 
         if devs
             if len(devs) > 1:
@@ -70,16 +70,16 @@ The following example is showing how to use `kboot` module in your code.
                     print("{}) {}".format(i, dev.info()))
                     
             # Connect to first USB device from all founded
-            kb.open_usb(devs[0])
+            mb.open_usb(devs[0])
 
             # Read MCU memory: 100 bytes from address 0
-            data = kb.read_memory(start_address=0, length=100)
+            data = mb.read_memory(start_address=0, length=100)
 
             # Other commands
             # ...
 
             # Close USB port if finish
-            kb.close()
+            mb.close()
             
         else:
             print("Connect device to PC !")
@@ -90,19 +90,19 @@ The following example is showing how to use `kboot` module in your code.
 
 ```
 
-[ kboot ] Tool
+[ mboot ] Tool
 --------------
 
-pyKBoot is distributed with command-line utility `kboot`, which presents the complete functionality of this library. 
-If you write `kboot` into shell and click enter, then you get the description of its usage. For getting the help of 
-individual commands just use `kboot <command name> -?`.
+pyMBoot is distributed with command-line utility `mboot`, which presents the complete functionality of this library.
+If you write `mboot` into shell and click enter, then you get the description of its usage. For getting the help of
+individual commands just use `mboot <command name> -?`.
 
 ``` bash
-  $ kboot --help
+  $ mboot --help
   
-    Usage: kboot [OPTIONS] COMMAND [ARGS]...
+    Usage: mboot [OPTIONS] COMMAND [ARGS]...
     
-      Kinetis Bootloader Command Line Interface, version: 0.2.0
+      NXP MCU Bootloader Command Line Interface, version: 0.2.0
       
       NOTE: Development version, be carefully with it usage !
       
@@ -115,7 +115,7 @@ individual commands just use `kboot <command name> -?`.
     Commands:
       erase   Erase MCU memory
       fill    Fill MCU memory with specified patern
-      info    Get MCU info (kboot properties)
+      info    Get MCU info (mboot properties)
       read    Read data from MCU memory
       reset   Reset MCU
       unlock  Unlock MCU
@@ -126,12 +126,12 @@ individual commands just use `kboot <command name> -?`.
 
 <br>
 
-#### $ kboot info
+#### $ mboot info
 
-Read kboot properties from connected MCU.
+Read bootloader properties from connected MCU.
 
 ``` bash
- $ kboot info
+ $ mboot info
 
  DEVICE: Kinetis Bootloader (0x15A2, 0x0073)
 
@@ -180,7 +180,7 @@ Read kboot properties from connected MCU.
 
 <br>
 
-#### $ kboot read [OPTIONS] ADDRESS [LENGTH]
+#### $ mboot read [OPTIONS] ADDRESS [LENGTH]
 
 Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.ihex) or s-record (*.srec or *.s19) 
 format. If output file is not specified, the data are dumped into stdout in readable format. 
@@ -193,7 +193,7 @@ format. If output file is not specified, the data are dumped into stdout in read
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot read 0 200
+ $ mboot read 0 200
  
  Reading from MCU memory, please wait !
 
@@ -217,7 +217,7 @@ format. If output file is not specified, the data are dumped into stdout in read
 
 <br>
 
-#### $ kboot write [OPTIONS] FILE
+#### $ mboot write [OPTIONS] FILE
 
 Write data from attached FILE into MCU memory.
 
@@ -227,14 +227,14 @@ Write data from attached FILE into MCU memory.
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot write blink.srec
+ $ mboot write blink.srec
 
  Wrote Successfully.
 ```
 
 <br>
 
-#### $ kboot erase [OPTIONS]
+#### $ mboot erase [OPTIONS]
 
 Erase MCU memory from specified address and length or complete chip. 
 
@@ -245,14 +245,14 @@ Erase MCU memory from specified address and length or complete chip.
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot erase -m
+ $ mboot erase -m
 
  Chip Erased Successfully.
 ```
 
 <br>
 
-#### $ kboot unlock [OPTIONS]
+#### $ mboot unlock [OPTIONS]
 
 Unlock MCU memory. 
 
@@ -261,14 +261,14 @@ Unlock MCU memory.
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot unlock
+ $ mboot unlock
 
  Chip Unlocked Successfully.
 ```
 
 <br>
 
-#### $ kboot fill [OPTIONS] ADDRESS LENGTH
+#### $ mboot fill [OPTIONS] ADDRESS LENGTH
 
 Fill MCU memory with specified pattern
 
@@ -277,19 +277,19 @@ Fill MCU memory with specified pattern
 * **-?, --help** - Show help message and exit.
 
 ``` bash
- $ kboot fill -p 0x11111111 0x1FFFE000 10
+ $ mboot fill -p 0x11111111 0x1FFFE000 10
 
  Filled Successfully.
 ```
 
 <br>
 
-#### $ kboot reset
+#### $ mboot reset
 
 MCU SW reset
 
 ``` bash
- $ kboot reset
+ $ mboot reset
 ```
 
 TODO

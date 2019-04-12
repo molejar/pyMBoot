@@ -8,7 +8,7 @@
 
 from os import path
 from setuptools import setup
-from kboot import __version__, __license__, __author__, __contact__
+from mboot import __version__, __license__, __author__, __contact__
 
 
 def long_description():
@@ -19,19 +19,19 @@ def long_description():
         return pypandoc.convert(readme_path, 'rst').replace('\r', '')
     except (IOError, ImportError):
         return (
-            "More on: https://github.com/molejar/pyKBoot"
+            "More on: https://github.com/molejar/pyMBoot"
         )
 
 setup(
-    name='kboot',
+    name='mboot',
     version=__version__,
     license=__license__,
     author=__author__,
     author_email=__contact__,
-    url="https://github.com/molejar/pyKBoot",
-    description='Python module for Kinetis Bootloader',
+    url="https://github.com/molejar/pyMBoot",
+    description='Python module for communication with NXP MCU Bootloader',
     long_description=long_description(),
-    keywords="Kinetis bootloader",
+    keywords="NXP MCU Bootloader",
     platforms="Windows, Linux",
     python_requires=">=3.5",
     setup_requires=[
@@ -55,10 +55,10 @@ setup(
         'Topic :: Software Development :: Embedded Systems',
         'Topic :: Utilities',
     ],
-    packages=['kboot'],
+    packages=['mboot'],
     entry_points={
         'console_scripts': [
-            'kboot = kboot.__main__:main',
+            'mboot = mboot.__main__:main',
         ],
     }
 )

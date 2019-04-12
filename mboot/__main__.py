@@ -9,7 +9,7 @@
 import os
 import sys
 import click
-import kboot
+import mboot
 import bincopy
 import traceback
 
@@ -175,7 +175,7 @@ OUTFILE = ImagePath('save')
 ERROR_CODE = 1
 
 # Application version
-VERSION = kboot.__version__
+VERSION = mboot.__version__
 
 # Application description
 DESCRIP = (
@@ -188,7 +188,7 @@ DESCRIP = (
 def scan_usb(device_name):
     # Scan for connected devices
 
-    fsls = kboot.scan_usb(device_name)
+    fsls = mboot.scan_usb(device_name)
 
     if fsls:
         index = 0
@@ -232,7 +232,7 @@ def cli(ctx, target, debug):
 
 
 # KBoot MCU Info Command
-@cli.command(short_help="Get MCU info (kboot properties)")
+@cli.command(short_help="Get MCU info (mboot properties)")
 @click.pass_context
 def info(ctx):
     # Read KBoot MCU Info (Properties collection)
@@ -244,7 +244,7 @@ def info(ctx):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device
@@ -312,13 +312,13 @@ def write(ctx, address, offset, file):
     click.echo(' Writing into MCU memory, please wait !\n')
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device
         kb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flash_sector_size = kb.get_property(kboot.EnumProperty.FLASH_SECTOR_SIZE)['raw_value']
+        flash_sector_size = kb.get_property(mboot.EnumProperty.FLASH_SECTOR_SIZE)['raw_value']
 
         # Align Erase Start Address and Len to Flash Sector Size
         saddr = (address & ~(flash_sector_size - 1))
@@ -363,14 +363,14 @@ def read(ctx, address, length, compress, file):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device
         kb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = kb.get_property(kboot.EnumProperty.FLASH_SIZE)['raw_value']
+            size = kb.get_property(mboot.EnumProperty.FLASH_SIZE)['raw_value']
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
@@ -395,7 +395,7 @@ def read(ctx, address, length, compress, file):
             if file.lower().endswith(('.srec', '.s19')):
                 srec = bincopy.BinFile()
                 srec.add_binary(data, address)
-                srec.header = 'kboot'
+                srec.header = 'mboot'
                 with open(file, "w") as f:
                     f.write(srec.as_srec())
             elif file.lower().endswith(('.hex', '.ihex')):
@@ -426,18 +426,18 @@ def erase(ctx, address, length, mass):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         if mass:
             # Connect KBoot USB device
             kb.open_usb(hid_dev)
             # Get available commands
-            commands = kb.get_property(kboot.EnumProperty.AVAILABLE_COMMANDS)
+            commands = kb.get_property(mboot.EnumProperty.AVAILABLE_COMMANDS)
             # Call KBoot flash erase all function
-            if kboot.is_available_command(kboot.EnumCommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
+            if mboot.is_available_command(mboot.EnumCommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
                 kb.flash_erase_all_unsecure()
-            elif kboot.is_available_command(kboot.EnumCommandTag.FLASH_ERASE_ALL, commands):
+            elif mboot.is_available_command(mboot.EnumCommandTag.FLASH_ERASE_ALL, commands):
                 kb.flash_erase_all()
             else:
                 raise Exception('Not Supported Command')
@@ -476,7 +476,7 @@ def unlock(ctx, key):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device
@@ -518,7 +518,7 @@ def fill(ctx, address, length, pattern):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device
@@ -553,7 +553,7 @@ def reset(ctx):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = kboot.KBoot()
+    kb = mboot.McuBoot()
 
     try:
         # Connect KBoot USB device

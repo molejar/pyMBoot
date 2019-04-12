@@ -8,11 +8,11 @@ from easy_enum import EEnum as Enum
 
 
 ########################################################################################################################
-# KBoot Commands Tag
+# McuBoot Commands Tag
 ########################################################################################################################
 
 class EnumCommandTag(Enum):
-    """ KBoot Commands """
+    """ McuBoot Commands """
 
     FLASH_ERASE_ALL = (0x01, 'FlashEraseAll', 'Erase Complete Flash')
     FLASH_ERASE_REGION = (0x02, 'FlashEraseRegion', 'Erase Flash Region')
@@ -44,11 +44,11 @@ class EnumCommandTag(Enum):
 
 
 ########################################################################################################################
-# KBoot Properties Tag
+# McuBoot Properties Tag
 ########################################################################################################################
 
 class EnumProperty(Enum):
-    """ KBoot Property constants """
+    """ McuBoot Property constants """
 
     LIST_PROPERTIES = (0x00, 'ListProperties', 'List Properties')
     CURRENT_VERSION = (0x01, 'CurrentVersion', 'Current Version')
@@ -82,11 +82,11 @@ class EnumProperty(Enum):
 
 
 ########################################################################################################################
-# KBoot Status
+# McuBoot Status
 ########################################################################################################################
 
 class EnumStatus(Enum):
-    """ Generic status codes """
+    """ McuBoot status codes """
 
     SUCCESS = (0, 'Success', 'Success')
     FAIL = (1, 'Fail', 'Fail')
