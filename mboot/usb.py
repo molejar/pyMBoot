@@ -161,7 +161,7 @@ if os.name == "nt":
             return targets
 
 
-elif os.name == "posix":
+else:
     try:
         import usb.core
         import usb.util
@@ -302,7 +302,5 @@ elif os.name == "posix":
 
             return targets
 
-else:
-    raise Exception("No USB backend found")
 
 
