@@ -5,7 +5,9 @@ pyMBoot
 [![PyPI Status](https://img.shields.io/pypi/v/mboot.svg)](https://pypi.python.org/pypi/mboot)
 [![Python Version](https://img.shields.io/pypi/pyversions/mboot.svg)](https://www.python.org)
 
-pyMBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuboot-mcu-bootloader-for-nxp-microcontrollers:MCUBOOT) (MCU Bootloader). Detailed description of MCUBOOT (KBOOT) key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
+pyMBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with
+embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuboot-mcu-bootloader-for-nxp-microcontrollers:MCUBOOT)
+(MCU Bootloader). Detailed description of `MCUBOOT / KBOOT` key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
 <p align="center">
   <img src="https://github.com/molejar/pyMBoot/blob/master/doc/connection.png?raw=true" alt="MBoot: HW Connection"/>
