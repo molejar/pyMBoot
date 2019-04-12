@@ -168,7 +168,7 @@ else:
     except:
         raise Exception("PyUSB is required on a Linux Machine")
 
-    class USBIF(RawHidBase):
+    class RawHID(RawHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pyusb:
