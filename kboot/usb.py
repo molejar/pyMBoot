@@ -43,7 +43,7 @@ class RawHidBase(object):
     def close(self):
         raise NotImplementedError()
 
-    def getInfo(self):
+    def info(self):
         return "{0:s} (0x{1:04X}, 0x{2:04X})".format(self.product_name, self.vid, self.pid)
 
     def write(self, id, data, size):

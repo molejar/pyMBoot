@@ -1,7 +1,11 @@
 pyKBoot
 =======
 
-pyKBoot is an Open Source python based library for configuring and upgrading the firmware in Kinetis Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). Detailed description of KBOOT key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
+[![Build Status](https://travis-ci.org/molejar/pyKBoot.svg?branch=master)](https://travis-ci.org/molejar/pyKBoot)
+[![PyPI Status](https://img.shields.io/pypi/v/kboot.svg)](https://pypi.python.org/pypi/kboot)
+[![Python Version](https://img.shields.io/pypi/pyversions/kboot.svg)](https://www.python.org)
+
+pyKBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with preloaded [KBOOT](http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/kinetis-cortex-m/kinetis-symbols-footprints-and-models/kinetis-bootloader:KBOOT) (Kinetis Bootloader). Detailed description of KBOOT key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
 <p align="center">
   <img src="https://github.com/molejar/pyKBoot/blob/master/doc/connection.png?raw=true" alt="KBoot: HW Connection"/>
@@ -63,7 +67,7 @@ The following example is showing how to use `kboot` module in your code.
             if len(devs) > 1:
                 # Print list of connected devices
                 for i, dev in enumerate(devs):
-                    print("{}) {}".format(i, dev.getInfo()))
+                    print("{}) {}".format(i, dev.info()))
                     
             # Connect to first USB device from all founded
             kb.open_usb(devs[0])
@@ -178,8 +182,8 @@ Read kboot properties from connected MCU.
 
 #### $ kboot read [OPTIONS] ADDRESS [LENGTH]
 
-Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.hex) or s-record (*.srec or *.s19) 
-format. If output file is not specified, the data are dumped into stdout. 
+Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.ihex) or s-record (*.srec or *.s19) 
+format. If output file is not specified, the data are dumped into stdout in readable format. 
 
 > LENGTH argument is optional and as default will be used the size to end of memory
 
@@ -253,7 +257,7 @@ Erase MCU memory from specified address and length or complete chip.
 Unlock MCU memory. 
 
 ##### options:
-* **-k, --key** - Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08
+* **-k, --key** - Use backdoor key as ASCII = S:123...8 or HEX = X:010203...08
 * **-?, --help** - Show help message and exit.
 
 ``` bash

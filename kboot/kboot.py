@@ -366,7 +366,7 @@ class KBoot(object):
         """ KBoot: Connect by USB
         """
         if dev is not None:
-            logging.info('Connect: %s', dev.getInfo())
+            logging.info('Connect: %s', dev.info())
             self._usb_dev = dev
             self._usb_dev.open()
 

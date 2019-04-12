@@ -17,13 +17,13 @@ import traceback
 ########################################################################################################################
 # Helper methods
 ########################################################################################################################
-def hexdump(data, saddr=0, compress=True, length=16, sep='.'):
-    """ Return string array in hex dump.format
-    :param data:     {List} The data array of {Bytes}
-    :param saddr:    {Int}  Absolute Start Address
-    :param compress: {Bool} Compressed output (remove duplicated content, rows)
-    :param length:   {Int}  Number of Bytes for row (max 16).
-    :param sep:      {Char} For the text part, {sep} will be used for non ASCII char.
+def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
+    """ Return string array in hex-dump format
+    :param data:          {List} The data array of {Bytes}
+    :param start_address: {Int}  Absolute Start Address
+    :param compress:      {Bool} Compressed output (remove duplicated content, rows)
+    :param length:        {Int}  Number of Bytes for row (max 16).
+    :param sep:           {Char} For the text part, {sep} will be used for non ASCII char.
     """
     msg = []
 
@@ -42,8 +42,8 @@ def hexdump(data, saddr=0, compress=True, length=16, sep='.'):
     msg.append((' ' + '-' * (13 + 4 * length)))
 
     # Check address align
-    offset = saddr % length
-    address = saddr - offset
+    offset = start_address % length
+    address = start_address - offset
     align = True if (offset > 0) else False
 
     # Print flags
@@ -197,14 +197,14 @@ def scan_usb(device_name):
             i = 0
             click.echo('')
             for fsl in fsls:
-                click.secho(" %d) %s" % (i, fsl.getInfo()))
+                click.secho(" %d) %s" % (i, fsl.info()))
                 i += 1
             click.echo('\n Select: ', nl=False)
             c = input()
             click.echo()
             index = int(c, 10)
 
-        click.secho(" DEVICE: %s\n" % fsls[index].getInfo())
+        click.secho(" DEVICE: %s\n" % fsls[index].info())
         return fsls[index]
 
     else:

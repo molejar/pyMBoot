@@ -8,6 +8,11 @@ from string import printable
 
 
 def size_fmt(value, use_kibibyte=True):
+    """ Convert integer value to string with size mark
+    :param value:
+    :param use_kibibyte:
+    :return:
+    """
     base, suffix = [(1000., 'B'), (1024., 'iB')][use_kibibyte]
     for x in ['B'] + [x + suffix for x in list('kMGTP')]:
         if -base < value < base:
@@ -16,8 +21,12 @@ def size_fmt(value, use_kibibyte=True):
     return "{0:3.1f} {1:s}".format(value, x)
 
 
-def atos(data, sep=' ', fmt='02X'):
-    """ Convert array of bytes to String
+def atos(data, separator=' ', fmt='02X'):
+    """ Convert array of bytes to string
+    :param data: Data in bytes or bytearray type
+    :param separator: String separator
+    :param fmt: String format
+    :return string
     """
     ret = ''
     for x in data:
@@ -25,13 +34,14 @@ def atos(data, sep=' ', fmt='02X'):
             ret += '.'
             continue
         ret += ('{:'+fmt+'}').format(x)
-        ret += sep
+        ret += separator
     return ret
 
 
 def crc16(data, crc_init=0):
-    """
-    Calculate CRC from input data
+    """ Calculate 16-bit CRC from input data
+    :param data:
+    :param crc_init: Initialization value
     :rtype: int value
     """
     crc = crc_init
