@@ -4,8 +4,8 @@
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
-from .enums import EnumCommandTag, EnumProperty, EnumStatus
-from .mboot import McuBoot, scan_usb, decode_property_value, is_available_command, \
+from .enums import CommandTag, PropertyTag, StatusCode
+from .mboot import McuBoot, scan_usb, decode_property_value, is_command_available, \
                    McuBootGenericError, McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
 
 __author__ = "Martin Olejar"
@@ -18,13 +18,13 @@ __all__ = [
     # global methods
     'scan_usb',
     'decode_property_value',
-    'is_available_command',
+    'is_command_available',
     # classes
     'McuBoot',
     # enums
-    'EnumCommandTag',
-    'EnumProperty',
-    'EnumStatus',
+    'CommandTag',
+    'PropertyTag',
+    'StatusCode',
     # exceptions
     'McuBootGenericError',
     'McuBootCommandError',

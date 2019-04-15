@@ -9,7 +9,7 @@ import logging
 from struct import pack, unpack_from
 
 # relative imports
-from .enums import EnumCommandTag, EnumProperty, EnumStatus
+from .enums import CommandTag, PropertyTag, StatusCode
 from .misc import atos, size_fmt
 from .uart import UART
 from .usb import RawHID
@@ -21,30 +21,30 @@ from .usb import RawHID
 
 def decode_property_value(property_tag, raw_value):
 
-    if property_tag == EnumProperty.CURRENT_VERSION:
+    if property_tag == PropertyTag.CURRENT_VERSION:
         str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
 
-    elif property_tag == EnumProperty.AVAILABLE_PERIPHERALS:
+    elif property_tag == PropertyTag.AVAILABLE_PERIPHERALS:
         str_value = []
         for key, value in McuBoot.INTERFACES.items():
             if value[0] & raw_value:
                 str_value.append(key)
 
-    elif property_tag == EnumProperty.FLASH_SECURITY_STATE:
+    elif property_tag == PropertyTag.FLASH_SECURITY_STATE:
         str_value = 'Unlocked' if raw_value == 0 else 'Locked'
 
-    elif property_tag == EnumProperty.AVAILABLE_COMMANDS:
+    elif property_tag == PropertyTag.AVAILABLE_COMMANDS:
         str_value = []
-        for name, value, desc in EnumCommandTag:
+        for name, value, desc in CommandTag:
             if (1 << value) & raw_value:
                 str_value.append(name)
 
-    elif property_tag in (EnumProperty.MAX_PACKET_SIZE, EnumProperty.FLASH_SECTOR_SIZE, EnumProperty.FLASH_SIZE,
-                          EnumProperty.RAM_SIZE):
+    elif property_tag in (PropertyTag.MAX_PACKET_SIZE, PropertyTag.FLASH_SECTOR_SIZE,
+                          PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE):
         str_value = size_fmt(raw_value)
 
-    elif property_tag in (EnumProperty.RAM_START_ADDRESS, EnumProperty.FLASH_START_ADDRESS,
-                          EnumProperty.SYSTEM_DEVICE_IDENT):
+    elif property_tag in (PropertyTag.RAM_START_ADDRESS, PropertyTag.FLASH_START_ADDRESS,
+                          PropertyTag.SYSTEM_DEVICE_IDENT):
         str_value = '0x{:08X}'.format(raw_value)
 
     else:
@@ -53,7 +53,7 @@ def decode_property_value(property_tag, raw_value):
     return str_value
 
 
-def is_available_command(command_tag, property_raw_value):
+def is_command_available(command_tag, property_raw_value):
     return True if (1 << command_tag) & property_raw_value else False
 
 
@@ -193,10 +193,12 @@ class McuBoot(object):
         self._pg_end = 100
         self._abort = False
 
-    def _parse_status(self, data):
+    @staticmethod
+    def _parse_status(data):
         return unpack_from('<I', data, 4)[0]
 
-    def _parse_value(self, data):
+    @staticmethod
+    def _parse_value(data):
         return unpack_from('<I', data, 8)[0]
 
     def _process_cmd(self, data, timeout=1000):
@@ -236,10 +238,10 @@ class McuBoot(object):
 
         # Parse and validate status flag
         status = self._parse_status(rxpkg)
-        if status != EnumStatus.SUCCESS:
-            if EnumStatus.is_valid(status):
-                logging.info('RX-CMD: %s', EnumStatus[status])
-                raise McuBootCommandError(errname=EnumStatus[status], errval=status)
+        if status != StatusCode.SUCCESS:
+            if StatusCode.is_valid(status):
+                logging.info('RX-CMD: %s', StatusCode[status])
+                raise McuBootCommandError(errname=StatusCode[status], errval=status)
             else:
                 logging.info('RX-CMD: Unknown Error %d', status)
                 raise McuBootCommandError(errval=status)
@@ -266,9 +268,9 @@ class McuBoot(object):
 
             if rep_id != self.HID_REPORT['DATA_IN']:
                 status = self._parse_status(pkg)
-                if EnumStatus.is_valid(status):
-                    logging.info('RX-DATA: %s' % EnumStatus.desc(status))
-                    raise McuBootDataError(mode='read', errname=EnumStatus.desc(status), errval=status)
+                if StatusCode.is_valid(status):
+                    logging.info('RX-DATA: %s' % StatusCode.desc(status))
+                    raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
                 else:
                     logging.info('RX-DATA: Unknown Error %d' % status)
                     raise McuBootDataError(mode='read', errval=status)
@@ -292,10 +294,10 @@ class McuBoot(object):
 
         # Parse and validate status flag
         status = self._parse_status(pkg)
-        if status != EnumStatus.SUCCESS:
-            if EnumStatus.is_valid(status):
-                logging.info('RX-DATA: %s' % EnumStatus.desc(status))
-                raise McuBootDataError(mode='read', errname=EnumStatus.desc(status), errval=status)
+        if status != StatusCode.SUCCESS:
+            if StatusCode.is_valid(status):
+                logging.info('RX-DATA: %s' % StatusCode.desc(status))
+                raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
             else:
                 logging.info('RX-DATA: Unknown Error %d' % status)
                 raise McuBootDataError(mode='read', errval=status)
@@ -339,9 +341,9 @@ class McuBoot(object):
 
         # Parse and validate status flag
         status = self._parse_status(pkg)
-        if status != EnumStatus.SUCCESS:
-            logging.info('TX-DATA: %s' % EnumStatus[status])
-            raise McuBootDataError(mode='write', errname=EnumStatus[status], errval=status)
+        if status != StatusCode.SUCCESS:
+            logging.info('TX-DATA: %s' % StatusCode[status])
+            raise McuBootDataError(mode='write', errname=StatusCode[status], errval=status)
 
         logging.info('TX-DATA: Successfully Send %d Bytes', len(data))
         return start
@@ -411,7 +413,7 @@ class McuBoot(object):
             logging.info('Disconnected !')
             return None
 
-        for property_name, property_tag, _ in EnumProperty:
+        for property_name, property_tag, _ in PropertyTag:
             try:
                 raw_value = self.get_property(property_tag)
                 str_value = decode_property_value(property_tag, raw_value)
@@ -426,7 +428,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAll')
         # Prepare FlashEraseAll command
-        cmd = pack('4B', EnumCommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00)
+        cmd = pack('4B', CommandTag.FLASH_ERASE_ALL, 0x00, 0x00, 0x00)
         # Process FlashEraseAll command
         self._process_cmd(cmd)
 
@@ -437,7 +439,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare FlashEraseRegion command
-        cmd = pack('<4B2I', EnumCommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B2I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
         # Process FlashEraseRegion command
         self._process_cmd(cmd, 5000)
 
@@ -451,7 +453,7 @@ class McuBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
         # Prepare ReadMemory command
-        cmd = pack('<4B2I', EnumCommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B2I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
         # Process ReadMemory command
         self._process_cmd(cmd)
         # Process Read Data
@@ -467,7 +469,7 @@ class McuBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
         # Prepare WriteMemory command
-        cmd = pack('<4B2I', EnumCommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
+        cmd = pack('<4B2I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
         # Process WriteMemory command
         self._process_cmd(cmd)
         # Process Write Data
@@ -481,7 +483,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FillMemory [ address=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, pattern)
         # Prepare FillMemory command
-        cmd = pack('<4B3I', EnumCommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
+        cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
         # Process FillMemory command
         self._process_cmd(cmd)
 
@@ -491,7 +493,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
         # Prepare FlashSecurityDisable command
-        cmd = pack('4B', EnumCommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
+        cmd = pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
         if len(backdoor_key) < 8:
             raise ValueError('Short range of backdoor key')
         cmd += bytes(backdoor_key[3::-1])
@@ -505,17 +507,17 @@ class McuBoot(object):
         :param ext_mem_identifier:
         :return {dict} with 'RAW' and 'STRING/LIST' value
         """
-        logging.info('TX-CMD: GetProperty->%s', EnumProperty[prop_tag])
+        logging.info('TX-CMD: GetProperty->%s', PropertyTag[prop_tag])
         # Prepare GetProperty command
         if ext_mem_identifier is None:
-            cmd = pack('<4BI', EnumCommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
+            cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
         else:
-            cmd = pack('<4B2I', EnumCommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, ext_mem_identifier)
+            cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, ext_mem_identifier)
         # Process GetProperty command
         rx_packet = self._process_cmd(cmd)
         # Parse property value
         raw_value = self._parse_value(rx_packet)
-        logging.info('RX-CMD: %s = %s', EnumProperty[prop_tag], decode_property_value(prop_tag, raw_value))
+        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
         return raw_value
 
     def set_property(self, prop_tag, value):
@@ -523,9 +525,9 @@ class McuBoot(object):
         :param  property_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
         """
-        logging.info('TX-CMD: SetProperty->%s = %d', EnumProperty[prop_tag], value)
+        logging.info('TX-CMD: SetProperty->%s = %d', PropertyTag[prop_tag], value)
         # Prepare SetProperty command
-        cmd = pack('<4B2I', EnumCommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value)
+        cmd = pack('<4B2I', CommandTag.SET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, value)
         # Process SetProperty command
         self._process_cmd(cmd)
 
@@ -537,7 +539,7 @@ class McuBoot(object):
             raise ValueError('Data len is zero')
         logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
         # Prepare WriteMemory command
-        cmd = pack('<4BI', EnumCommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
+        cmd = pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
         # Process WriteMemory command
         self._process_cmd(cmd)
         # Process Write Data
@@ -552,7 +554,7 @@ class McuBoot(object):
         logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument,
                      sp_address)
         # Prepare Execute command
-        cmd = pack('<4B3I', EnumCommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
+        cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
         # Process Execute command
         self._process_cmd(cmd)
 
@@ -564,7 +566,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
         # Prepare Call command
-        cmd = pack('<4B3I', EnumCommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
+        cmd = pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
         # Process Call command
         self._process_cmd(cmd)
 
@@ -572,7 +574,7 @@ class McuBoot(object):
         """ KBoot: Reset MCU """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
-        cmd = pack('4B', EnumCommandTag.RESET, 0x00, 0x00, 0x00)
+        cmd = pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
         # Process Reset command
         try:
             self._process_cmd(cmd)
@@ -584,7 +586,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
-        cmd = pack('4B', EnumCommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
+        cmd = pack('4B', CommandTag.FLASH_ERASE_ALL_UNSECURE, 0x00, 0x00, 0x00)
         # Process FlashEraseAllUnsecure command
         self._process_cmd(cmd)
 
@@ -600,7 +602,7 @@ class McuBoot(object):
             raise ValueError('Index out of range')
         logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d   ]', index, length)
         # Prepare FlashReadOnce command
-        cmd = pack('<4B2I', EnumCommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
+        cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
         # Process FlashReadOnce command
         self._process_cmd(cmd)
         # Process Read Data
@@ -618,7 +620,7 @@ class McuBoot(object):
             raise ValueError('Index out of range')
         logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, atos(data[:length]))
         # Prepare FlashProgramOnce command
-        cmd = pack('<4B2I', EnumCommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
+        cmd = pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
         cmd += bytes(data)
         # Process FlashProgramOnce command
         self._process_cmd(cmd)
@@ -633,7 +635,7 @@ class McuBoot(object):
         """
         logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
         # Prepare FlashReadResource command
-        cmd = pack('<4B3I', EnumCommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
+        cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
         # Process FlashReadResource command
         pkg = self._process_cmd(cmd)
         rx_len = self._parse_value(pkg)

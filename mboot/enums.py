@@ -11,7 +11,7 @@ from easy_enum import EEnum as Enum
 # McuBoot Commands Tag
 ########################################################################################################################
 
-class EnumCommandTag(Enum):
+class CommandTag(Enum):
     """ McuBoot Commands """
 
     FLASH_ERASE_ALL = (0x01, 'FlashEraseAll', 'Erase Complete Flash')
@@ -47,8 +47,8 @@ class EnumCommandTag(Enum):
 # McuBoot Properties Tag
 ########################################################################################################################
 
-class EnumProperty(Enum):
-    """ McuBoot Property constants """
+class PropertyTag(Enum):
+    """ McuBoot Properties """
 
     LIST_PROPERTIES = (0x00, 'ListProperties', 'List Properties')
     CURRENT_VERSION = (0x01, 'CurrentVersion', 'Current Version')
@@ -85,7 +85,7 @@ class EnumProperty(Enum):
 # McuBoot Status
 ########################################################################################################################
 
-class EnumStatus(Enum):
+class StatusCode(Enum):
     """ McuBoot status codes """
 
     SUCCESS = (0, 'Success', 'Success')

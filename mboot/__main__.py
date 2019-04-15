@@ -179,7 +179,7 @@ VERSION = mboot.__version__
 
 # Application description
 DESCRIP = (
-    "Kinetis Bootloader Command Line Interface, version: " + VERSION + " \n\n"
+    "NXP MCU Bootloader Command Line Interface, version: " + VERSION + " \n\n"
     "NOTE: Development version, be carefully with it usage !\n"
 )
 
@@ -318,7 +318,7 @@ def write(ctx, address, offset, file):
         # Connect KBoot USB device
         kb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flash_sector_size = kb.get_property(mboot.EnumProperty.FLASH_SECTOR_SIZE)['raw_value']
+        flash_sector_size = kb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)['raw_value']
 
         # Align Erase Start Address and Len to Flash Sector Size
         saddr = (address & ~(flash_sector_size - 1))
@@ -370,7 +370,7 @@ def read(ctx, address, length, compress, file):
         kb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = kb.get_property(mboot.EnumProperty.FLASH_SIZE)['raw_value']
+            size = kb.get_property(mboot.PropertyTag.FLASH_SIZE)['raw_value']
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
@@ -433,11 +433,11 @@ def erase(ctx, address, length, mass):
             # Connect KBoot USB device
             kb.open_usb(hid_dev)
             # Get available commands
-            commands = kb.get_property(mboot.EnumProperty.AVAILABLE_COMMANDS)
+            commands = kb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
             # Call KBoot flash erase all function
-            if mboot.is_available_command(mboot.EnumCommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
+            if mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
                 kb.flash_erase_all_unsecure()
-            elif mboot.is_available_command(mboot.EnumCommandTag.FLASH_ERASE_ALL, commands):
+            elif mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL, commands):
                 kb.flash_erase_all()
             else:
                 raise Exception('Not Supported Command')
