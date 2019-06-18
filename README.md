@@ -9,7 +9,7 @@ pyMBoot is an Open Source python based library for configuring and upgrading the
 embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuboot-mcu-bootloader-for-nxp-microcontrollers:MCUBOOT)
 (MCU Bootloader). Detailed description of `MCUBOOT / KBOOT` key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
-> The pyMBoot project is still in beta phase. Please, check issues for the ongoing tasks or todo tasks.
+> This project is still in developing phase. Please, test it and report founded issues.
 
 Dependencies
 ------------
@@ -65,7 +65,7 @@ The following example is showing how to use `mboot` module in your code.
         # Scan for connected MCU's
         devs = mboot.scan_usb()
 
-        if devs
+        if devs:
             if len(devs) > 1:
                 # Print list of connected devices
                 for i, dev in enumerate(devs):
@@ -184,14 +184,14 @@ Read bootloader properties from connected MCU.
 
 #### $ mboot read [OPTIONS] ADDRESS [LENGTH]
 
-Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.ihex) or s-record (*.srec or *.s19) 
+Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.hex, *.ihex) or s-record (*.srec, *.s19) 
 format. If output file is not specified, the data are dumped into stdout in readable format. 
 
 > LENGTH argument is optional and as default will be used the size to end of memory
 
 ##### options:
 * **-c, --compress** - Compress dump output. (default: False)
-* **-f, --file** -  Output file name with extension: *.bin, *.ihex, *.srec or *.s19
+* **-f, --file** -  Output file name with extension: *.bin, *.hex, *.ihex, *.srec or *.s19
 * **-?, --help** - Show help message and exit.
 
 ``` bash

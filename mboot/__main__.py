@@ -151,7 +151,7 @@ class ImagePath(click.ParamType):
         return 'IPATH'
 
     def convert(self, value, param, ctx):
-        if not value.lower().endswith(('.bin', '.hex', '.s19', '.srec')):
+        if not value.lower().endswith(('.bin', '.hex', '.ihex',  '.s19', '.srec')):
             self.fail('Unsupported file type: *.{} !'.format(value.split('.')[-1]), param, ctx)
 
         if self.mode == 'open' and not os.path.lexists(value):
@@ -297,7 +297,7 @@ def write(ctx, address, offset, file):
         else:
             in_data.add_binary_file(file)
             if address is None:
-                raise Exception("Argument \"-a, --address\" must be defined !")
+                address = 0
 
         data = in_data.as_binary()
     except Exception as e:
@@ -350,7 +350,7 @@ def write(ctx, address, offset, file):
 # KBoot MCU memory read command
 @cli.command(short_help="Read data from MCU memory")
 @click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
-@click.option('-f', '--file', type=OUTFILE, help='Output file name with extension: *.bin, *.ihex, *.srec or *.s19')
+@click.option('-f', '--file', type=OUTFILE, help='Output file name with ext.: *.bin, *.hex, *.ihex, *.srec or *.s19')
 @click.argument('address', type=UINT)
 @click.argument('length',  type=UINT, required=False)
 @click.pass_context
@@ -370,7 +370,7 @@ def read(ctx, address, length, compress, file):
         kb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = kb.get_property(mboot.PropertyTag.FLASH_SIZE)['raw_value']
+            size = kb.get_property(mboot.PropertyTag.FLASH_SIZE)
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
