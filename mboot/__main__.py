@@ -298,10 +298,10 @@ def write(ctx, address, offset, file):
             in_data.add_binary_file(file)
             if address is None:
                 raise Exception("Argument \"-a, --address\" must be defined !")
+
+        data = in_data.as_binary()
     except Exception as e:
         raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
-
-    data = in_data.as_binary()
 
     if offset < len(data):
         data = data[offset:]
@@ -318,16 +318,16 @@ def write(ctx, address, offset, file):
         # Connect KBoot USB device
         kb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flash_sector_size = kb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)['raw_value']
+        flash_sector_size = kb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)
 
         # Align Erase Start Address and Len to Flash Sector Size
-        saddr = (address & ~(flash_sector_size - 1))
-        slen = (len(data) & ~(flash_sector_size - 1))
+        start_address = (address & ~(flash_sector_size - 1))
+        length = (len(data) & ~(flash_sector_size - 1))
         if (len(data) % flash_sector_size) > 0:
-            slen += flash_sector_size
+            length += flash_sector_size
 
         # Erase specified region in MCU Flash memory
-        kb.flash_erase_region(saddr, slen)
+        kb.flash_erase_region(start_address, length)
 
         # Write data into MCU Flash memory
         kb.write_memory(address, data)
@@ -350,7 +350,7 @@ def write(ctx, address, offset, file):
 # KBoot MCU memory read command
 @cli.command(short_help="Read data from MCU memory")
 @click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
-@click.option('-f', '--file', type=OUTFILE, help='Output file name with extension: *.bin, *.hex, *.srec or *.s19')
+@click.option('-f', '--file', type=OUTFILE, help='Output file name with extension: *.bin, *.ihex, *.srec or *.s19')
 @click.argument('address', type=UINT)
 @click.argument('length',  type=UINT, required=False)
 @click.pass_context
