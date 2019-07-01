@@ -52,28 +52,27 @@ def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
 
     # process data
     for i in range(0, len(data) + offset, length):
-
         hexa = ''
         if align:
-            subSrc = data[0: length - offset]
+            substr = data[0: length - offset]
         else:
-            subSrc = data[i - offset: i + length - offset]
+            substr = data[i - offset: i + length - offset]
             if compress:
                 # compress output string
-                if subSrc == prev_line:
+                if substr == prev_line:
                     if print_mark:
                         print_mark = False
                         msg.append(' *')
                     continue
                 else:
-                    prev_line = subSrc
+                    prev_line = substr
                     print_mark = True
 
         if align:
             hexa += '   ' * offset
 
-        for h in range(0, len(subSrc)):
-            h = subSrc[h]
+        for h in range(0, len(substr)):
+            h = substr[h]
             if not isinstance(h, int):
                 h = ord(h)
             hexa += "{:02X} ".format(h)
@@ -82,7 +81,7 @@ def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
         if align:
             text += ' ' * offset
 
-        for c in subSrc:
+        for c in substr:
             if not isinstance(c, int):
                 c = ord(c)
             if 0x20 <= c < 0x7F:
@@ -187,32 +186,29 @@ DESCRIP = (
 # helper method
 def scan_usb(device_name):
     # Scan for connected devices
+    devs = mboot.scan_usb(device_name)
 
-    fsls = mboot.scan_usb(device_name)
-
-    if fsls:
+    if devs:
         index = 0
 
-        if len(fsls) > 1:
-            i = 0
+        if len(devs) > 1:
             click.echo('')
-            for fsl in fsls:
-                click.secho(" %d) %s" % (i, fsl.info()))
-                i += 1
+            for i, dev in enumerate(devs):
+                click.secho("{}) {}".format(i, dev.info()))
             click.echo('\n Select: ', nl=False)
             c = input()
             click.echo()
             index = int(c, 10)
 
-        click.secho(" DEVICE: %s\n" % fsls[index].info())
-        return fsls[index]
+        click.secho(" DEVICE: {}\n".format(devs[index].info()))
+        return devs[index]
 
     else:
         click.echo("\n - Target not detected !")
         sys.exit(ERROR_CODE)
 
 
-# KBoot base options
+# MBoot base options
 @click.group(context_settings=dict(help_option_names=['-?', '--help']), help=DESCRIP)
 @click.option('-t', '--target', type=click.STRING, default=None, help='Select target MKL27, LPC55, ... [optional]')
 @click.option('-d', "--debug", type=click.IntRange(0, 2, True), default=0, help='Debug level: 0-off, 1-info, 2-debug')
@@ -231,11 +227,11 @@ def cli(ctx, target, debug):
     click.echo()
 
 
-# KBoot MCU Info Command
+# MBoot MCU Info Command
 @cli.command(short_help="Get MCU info (mboot properties)")
 @click.pass_context
 def info(ctx):
-    # Read KBoot MCU Info (Properties collection)
+    # Read MBoot MCU Info (Properties collection)
 
     nfo = []
     err_msg = ""
@@ -243,7 +239,7 @@ def info(ctx):
     # Scan USB
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    # Create KBoot instance
+    # Create MBoot instance
     kb = mboot.McuBoot()
 
     try:
@@ -274,7 +270,7 @@ def info(ctx):
         click.echo(m)
 
 
-# KBoot MCU memory write command
+# MBoot memory write command
 @cli.command(short_help="Write data into MCU memory")
 @click.option('-a', '--address', type=UINT, default=None, help='Start Address.')
 @click.option('-o', '--offset', type=UINT, default=0, show_default=True, help='Offset of input data.')
@@ -311,14 +307,14 @@ def write(ctx, address, offset, file):
 
     click.echo(' Writing into MCU memory, please wait !\n')
 
-    # Create KBoot instance
-    kb = mboot.McuBoot()
+    # Create MBoot instance
+    mb = mboot.McuBoot()
 
     try:
-        # Connect KBoot USB device
-        kb.open_usb(hid_dev)
+        # Connect MBoot USB device
+        mb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flash_sector_size = kb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)
+        flash_sector_size = mb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)
 
         # Align Erase Start Address and Len to Flash Sector Size
         start_address = (address & ~(flash_sector_size - 1))
@@ -327,15 +323,15 @@ def write(ctx, address, offset, file):
             length += flash_sector_size
 
         # Erase specified region in MCU Flash memory
-        kb.flash_erase_region(start_address, length)
+        mb.flash_erase_region(start_address, length)
 
         # Write data into MCU Flash memory
-        kb.write_memory(address, data)
+        mb.write_memory(address, data)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot device
-    kb.close()
+    # Disconnect MBoot device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)
@@ -347,7 +343,7 @@ def write(ctx, address, offset, file):
     click.echo(" Wrote Successfully.")
 
 
-# KBoot MCU memory read command
+# MBoot memory read command
 @cli.command(short_help="Read data from MCU memory")
 @click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
 @click.option('-f', '--file', type=OUTFILE, help='Output file name with ext.: *.bin, *.hex, *.ihex, *.srec or *.s19')
@@ -362,26 +358,26 @@ def read(ctx, address, length, compress, file):
     # Scan USB
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    # Create KBoot instance
-    kb = mboot.McuBoot()
+    # Create MBoot instance
+    mb = mboot.McuBoot()
 
     try:
-        # Connect KBoot USB device
-        kb.open_usb(hid_dev)
+        # Connect MBoot USB device
+        mb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = kb.get_property(mboot.PropertyTag.FLASH_SIZE)
+            size = mb.get_property(mboot.PropertyTag.FLASH_SIZE)
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
         click.echo(" Reading from MCU memory, please wait ! \n")
-        # Call KBoot flash erase all function
-        data = kb.read_memory(address, length)
+        # Call MBoot flash erase all function
+        data = mb.read_memory(address, length)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot Device
-    kb.close()
+    # Disconnect MBoot Device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)
@@ -412,7 +408,7 @@ def read(ctx, address, length, compress, file):
         click.echo("\n Successfully saved into: {}".format(file))
 
 
-# KBoot MCU memory erase command
+# MBoot memory erase command
 @cli.command(short_help="Erase MCU memory")
 @click.option('-m/', '--mass/', is_flag=True, default=False, help='Erase complete MCU memory.')
 @click.option('-a', '--address', type=UINT, help='Start Address.')
@@ -425,34 +421,34 @@ def erase(ctx, address, length, mass):
     # Scan USB
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    # Create KBoot instance
-    kb = mboot.McuBoot()
+    # Create MBoot instance
+    mb = mboot.McuBoot()
 
     try:
         if mass:
-            # Connect KBoot USB device
-            kb.open_usb(hid_dev)
+            # Connect MBoot USB device
+            mb.open_usb(hid_dev)
             # Get available commands
-            commands = kb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
-            # Call KBoot flash erase all function
+            commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
+            # Call MBoot flash erase all function
             if mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
-                kb.flash_erase_all_unsecure()
+                mb.flash_erase_all_unsecure()
             elif mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL, commands):
-                kb.flash_erase_all()
+                mb.flash_erase_all()
             else:
                 raise Exception('Not Supported Command')
         else:
             if address is None or length is None:
                 raise Exception("Argument \"-a, --address\" and \"-l, --length\" must be defined !")
-            # Connect KBoot USB device
-            kb.open_usb(hid_dev)
-            # Call KBoot flash erase region function
-            kb.flash_erase_region(address, length)
+            # Connect MBoot USB device
+            mb.open_usb(hid_dev)
+            # Call MBoot flash erase region function
+            mb.flash_erase_region(address, length)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot Device
-    kb.close()
+    # Disconnect MBoot Device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)
@@ -464,7 +460,7 @@ def erase(ctx, address, length, mass):
     click.secho(" Erased Successfully.")
 
 
-# KBoot MCU unlock command
+# MBoot unlock command
 @cli.command(short_help="Unlock MCU")
 @click.option('-k', '--key', type=BDKEY, help='Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08')
 @click.pass_context
@@ -475,24 +471,24 @@ def unlock(ctx, key):
     # Scan USB
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    # Create KBoot instance
-    kb = mboot.McuBoot()
+    # Create MBoot instance
+    mb = mboot.McuBoot()
 
     try:
-        # Connect KBoot USB device
-        kb.open_usb(hid_dev)
+        # Connect MBoot USB device
+        mb.open_usb(hid_dev)
 
         if key is None:
-            # Call KBoot flash erase all and unsecure function
-            kb.flash_erase_all_unsecure()
+            # Call MBoot flash erase all and unsecure function
+            mb.flash_erase_all_unsecure()
         else:
-            # Call KBoot flash security disable function
-            kb.flash_security_disable(key)
+            # Call MBoot flash security disable function
+            mb.flash_security_disable(key)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot Device
-    kb.close()
+    # Disconnect MBoot Device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)
@@ -504,7 +500,7 @@ def unlock(ctx, key):
     click.echo(" Unlocked Successfully.")
 
 
-# KBoot MCU fill memory command
+# MBoot fill memory command
 @cli.command(short_help="Fill MCU memory with specified pattern")
 @click.option('-p', '--pattern', type=UINT, default=0xFFFFFFFF, help='Pattern format (default: 0xFFFFFFFF).')
 @click.argument('address', type=UINT)
@@ -517,20 +513,20 @@ def fill(ctx, address, length, pattern):
     # Scan USB
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
-    # Create KBoot instance
-    kb = mboot.McuBoot()
+    # Create MBoot instance
+    mb = mboot.McuBoot()
 
     try:
-        # Connect KBoot USB device
-        kb.open_usb(hid_dev)
+        # Connect MBoot USB device
+        mb.open_usb(hid_dev)
 
-        # Call KBoot fill memory function
-        kb.fill_memory(address, length, pattern)
+        # Call MBoot fill memory function
+        mb.fill_memory(address, length, pattern)
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot Device
-    kb.close()
+    # Disconnect MBoot Device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)
@@ -542,7 +538,7 @@ def fill(ctx, address, length, pattern):
     click.secho(" Filled Successfully.")
 
 
-# KBoot MCU reset command
+# MBoot reset command
 @cli.command(short_help="Reset MCU")
 @click.pass_context
 def reset(ctx):
@@ -553,19 +549,19 @@ def reset(ctx):
     hid_dev = scan_usb(ctx.obj['TARGET'])
 
     # Create KBoot instance
-    kb = mboot.McuBoot()
+    mb = mboot.McuBoot()
 
     try:
-        # Connect KBoot USB device
-        kb.open_usb(hid_dev)
+        # Connect MBoot USB device
+        mb.open_usb(hid_dev)
 
-        # Call KBoot MCU reset function
-        kb.reset()
+        # Call MBoot MCU reset function
+        mb.reset()
     except Exception as e:
         err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
 
-    # Disconnect KBoot Device
-    kb.close()
+    # Disconnect MBoot Device
+    mb.close()
 
     if err_msg:
         click.echo(err_msg)

@@ -5,8 +5,8 @@
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 from .enums import CommandTag, PropertyTag, StatusCode
-from .mboot import McuBoot, scan_usb, decode_property_value, is_command_available, \
-                   McuBootGenericError, McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
+from .mboot import McuBoot, scan_usb, decode_property_value, is_command_available, McuBootGenericError, \
+                   McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"

@@ -58,13 +58,13 @@ def is_command_available(command_tag, property_raw_value):
 
 
 ########################################################################################################################
-# KBoot Exceptions
+# McuBoot Exceptions
 ########################################################################################################################
 
 class McuBootGenericError(Exception):
-    """ Base Exception class for KBoot module """
+    """ Base Exception class for MBoot module """
 
-    _fmt = 'KBoot Error'
+    _fmt = 'MBoot Error'
 
     def __init__(self, msg=None, **kw):
         """ Initialize the Exception with given message. """
@@ -107,15 +107,15 @@ class McuBootDataError(McuBootGenericError):
 
 
 class McuBootConnectionError(McuBootGenericError):
-    _fmt = 'KBoot connection error'
+    _fmt = 'MBoot connection error'
 
 
 class McuBootTimeOutError(McuBootGenericError):
-    _fmt = 'KBoot timeout error'
+    _fmt = 'MBoot timeout error'
 
 
 ########################################################################################################################
-# KBoot interfaces
+# McuBoot interfaces
 ########################################################################################################################
 
 DEVICES = {
@@ -126,7 +126,8 @@ DEVICES = {
 
 
 def scan_usb(device_name=None):
-    """ KBoot: Scan commected USB devices
+    """ MBoot: Scan connected USB devices
+    :param device_name: The specific device name (MKL27, LPC55, ...) or VID:PID
     :rtype : list
     """
     devices = []
@@ -157,7 +158,7 @@ def scan_uart():
 class McuBoot(object):
 
     HID_REPORT = {
-        # KBoot USB HID Reports.
+        # MBoot USB HID Reports.
         'CMD_OUT': 0x01,
         'CMD_IN': 0x03,
         'DATA_OUT': 0x02,
@@ -165,7 +166,7 @@ class McuBoot(object):
     }
 
     INTERFACES = {
-        #  KBoot Interface | mask | default speed
+        #  MBoot Interface | mask | default speed
         'UART':      [0x00000001, 115200],
         'I2C-Slave': [0x00000002, 400],
         'SPI-Slave': [0x00000004, 400],
@@ -176,7 +177,7 @@ class McuBoot(object):
     }
 
     class _FPType:
-        # KBoot Framing Packet Type.
+        # MBoot Framing Packet Type.
         ACK = 0xA1
         NACK = 0xA2
         ABORT = 0xA3
@@ -357,7 +358,8 @@ class McuBoot(object):
         self._abort = True
 
     def is_open(self):
-        """ KBoot: Check if device connected
+        """ MBoot: Check if device connected
+        :rtype : bool
         """
         if self._usb_dev is not None:
             return True
@@ -365,7 +367,8 @@ class McuBoot(object):
             return False
 
     def open_usb(self, dev):
-        """ KBoot: Connect by USB
+        """ MBoot: Connect by USB
+        :rtype : bool
         """
         if dev is not None:
             logging.info('Connect: %s', dev.info())
@@ -378,7 +381,8 @@ class McuBoot(object):
             return False
 
     def open_uart(self, port, baudrate):
-        """ KBoot: Connect by UART
+        """ MBoot: Connect by UART
+        :rtype : bool
         """
         if port is not None:
             self._uart_dev = UART()
@@ -393,7 +397,7 @@ class McuBoot(object):
             return False
 
     def close(self):
-        """ KBoot: Disconnect device
+        """ MBoot: Disconnect device
         """
         if self._usb_dev:
             self._usb_dev.close()
@@ -401,11 +405,9 @@ class McuBoot(object):
         elif self._uart_dev:
             self._uart_dev.close()
             self._uart_dev = None
-        else:
-            return
 
     def get_mcu_info(self):
-        """ KBoot: Get MCU info (available properties collection)
+        """ MBoot: Get MCU info (available properties collection)
         :return List of {dict}
         """
         mcu_info = {}
@@ -424,7 +426,7 @@ class McuBoot(object):
         return mcu_info
 
     def flash_erase_all(self):
-        """ KBoot: Erase complete flash memory without recovering flash security section
+        """ MBoot: Erase complete flash memory without recovering flash security section
         """
         logging.info('TX-CMD: FlashEraseAll')
         # Prepare FlashEraseAll command
@@ -433,7 +435,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def flash_erase_region(self, start_address, length):
-        """ KBoot: Erase specified range of flash
+        """ MBoot: Erase specified range of flash
         :param start_address: Start address
         :param length: Count of bytes
         """
@@ -444,7 +446,7 @@ class McuBoot(object):
         self._process_cmd(cmd, 5000)
 
     def read_memory(self, start_address, length):
-        """ KBoot: Read data from MCU memory
+        """ MBoot: Read data from MCU memory
         :param start_address: Start address
         :param length: Count of bytes
         :return List of bytes
@@ -460,7 +462,7 @@ class McuBoot(object):
         return self._read_data(length)
 
     def write_memory(self, start_address, data):
-        """ KBoot: Write data into MCU memory
+        """ MBoot: Write data into MCU memory
         :param start_address: Start address
         :param data: List of bytes
         :return Count of wrote bytes
@@ -476,7 +478,7 @@ class McuBoot(object):
         return self._send_data(data)
 
     def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
-        """ KBoot: Fill MCU memory with specified pattern
+        """ MBoot: Fill MCU memory with specified pattern
         :param start_address: Start address (must be word aligned)
         :param length: Count of words (must be word aligned)
         :param pattern: Count of wrote bytes
@@ -488,7 +490,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def flash_security_disable(self, backdoor_key):
-        """ KBoot: Disable flash security by backdoor key
+        """ MBoot: Disable flash security by backdoor key
         :param backdoor_key:
         """
         logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
@@ -502,7 +504,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def get_property(self, prop_tag, ext_mem_identifier=None):
-        """ KBoot: Get value of specified property
+        """ MBoot: Get value of specified property
         :param prop_tag: The property ID (see Property enumerator)
         :param ext_mem_identifier:
         :return {dict} with 'RAW' and 'STRING/LIST' value
@@ -521,8 +523,8 @@ class McuBoot(object):
         return raw_value
 
     def set_property(self, prop_tag, value):
-        """ KBoot: Set value of specified property
-        :param  property_tag: The property ID (see Property enumerator)
+        """ MBoot: Set value of specified property
+        :param  prop_tag: The property ID (see Property enumerator)
         :param  value: The value of selected property
         """
         logging.info('TX-CMD: SetProperty->%s = %d', PropertyTag[prop_tag], value)
@@ -532,7 +534,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def receive_sb_file(self, data):
-        """ KBoot: Receive SB file
+        """ MBoot: Receive SB file
         :param  data: SB file data
         """
         if len(data) == 0:
@@ -546,7 +548,7 @@ class McuBoot(object):
         return self._send_data(data)
 
     def execute(self, jump_address, argument, sp_address):
-        """ KBoot: Fill MCU memory with specified pattern
+        """ MBoot: Fill MCU memory with specified pattern
         :param jump_address: Jump address (must be word aligned)
         :param argument: Function arguments address
         :param sp_address: Stack pointer address
@@ -559,7 +561,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def call(self, call_address, argument, sp_address):
-        """ KBoot: Fill MCU memory with specified pattern
+        """ MBoot: Fill MCU memory with specified pattern
         :param call_address: Call address (must be word aligned)
         :param argument: Function arguments address
         :param sp_address: Stack pointer address
@@ -571,7 +573,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def reset(self):
-        """ KBoot: Reset MCU """
+        """ MBoot: Reset MCU """
         logging.info('TX-CMD: Reset MCU')
         # Prepare Reset command
         cmd = pack('4B', CommandTag.RESET, 0x00, 0x00, 0x00)
@@ -582,7 +584,7 @@ class McuBoot(object):
             pass
 
     def flash_erase_all_unsecure(self):
-        """ KBoot: Erase complete flash memory and recover flash security section
+        """ MBoot: Erase complete flash memory and recover flash security section
         """
         logging.info('TX-CMD: FlashEraseAllUnsecure')
         # Prepare FlashEraseAllUnsecure command
@@ -591,7 +593,7 @@ class McuBoot(object):
         self._process_cmd(cmd)
 
     def flash_read_once(self, index, length):
-        """ KBoot: Read from MCU flash program once region (max 8 bytes)
+        """ MBoot: Read from MCU flash program once region (max 8 bytes)
         :param index: Start index
         :param length: Count of bytes
         :return List of bytes
@@ -609,7 +611,7 @@ class McuBoot(object):
         return self._read_data(length)
 
     def flash_program_once(self, index, data):
-        """ KBoot: Write into MCU flash program once region (max 8 bytes)
+        """ MBoot: Write into MCU flash program once region (max 8 bytes)
         :param index: Start index
         :param data: List of bytes
         """
@@ -627,7 +629,7 @@ class McuBoot(object):
         return length
 
     def flash_read_resource(self, start_address, length, option=1):
-        """ KBoot: Read resource of flash module
+        """ MBoot: Read resource of flash module
         :param start_address:
         :param length:
         :param option:

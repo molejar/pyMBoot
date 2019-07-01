@@ -11,8 +11,9 @@ from time import time
 from struct import pack, unpack_from
 from .misc import atos
 
-#os.environ['PYUSB_DEBUG'] = 'debug'
-#os.environ['PYUSB_LOG_FILENAME'] = 'usb.log'
+
+# os.environ['PYUSB_DEBUG'] = 'debug'
+# os.environ['PYUSB_LOG_FILENAME'] = 'usb.log'
 
 
 ########################################################################################################################
@@ -26,13 +27,15 @@ class RawHidBase(object):
         self.vendor_name = ""
         self.product_name = ""
 
-    def _encode_packet(self, report_id, data, pkglen=36):
+    @staticmethod
+    def _encode_packet(report_id, data, pkglen=36):
         raw_data = pack('<BBH', report_id, 0x00, len(data))
         raw_data += data
-        raw_data += bytes([0x00]*(pkglen - len(raw_data)))
+        raw_data += bytes([0x00] * (pkglen - len(raw_data)))
         return raw_data
 
-    def _decode_packet(self, raw_data):
+    @staticmethod
+    def _decode_packet(raw_data):
         report_id, _, plen = unpack_from('<BBH', raw_data)
         data = raw_data[4:4 + plen]
         return report_id, data
@@ -69,6 +72,7 @@ if os.name == "nt":
         a USB HID device using pywinusb:
             - write/read an endpoint
         """
+
         def __init__(self):
             super().__init__()
             # Vendor page and usage_id = 2
@@ -87,19 +91,20 @@ if os.name == "nt":
 
         def open(self):
             """ open the interface """
-            logging.debug("Opening USB interface")
+            logging.debug("Open USB interface")
             self.device.set_raw_data_handler(self.__rx_handler)
             self.device.open(shared=False)
 
         def close(self):
             """ close the interface """
-            logging.debug("Closing USB interface")
+            logging.debug("Close USB interface")
             self.device.close()
 
         def write(self, id, data, size=None):
-            """
-            write data on the OUT endpoint associated to the HID interface
-
+            """ Write data on the OUT endpoint associated to the HID interface
+            :param id: HID packet ID
+            :param data: HID packet data
+            :param size: HID packet size
             """
             if size is None:
                 size = self.report[id - 1]._HidReport__raw_report_size
@@ -109,8 +114,7 @@ if os.name == "nt":
             self.report[id - 1].send(rawdata)
 
         def read(self, timeout=2000):
-            """
-            Read data on the IN endpoint associated to the HID interface
+            """ Read data from IN endpoint associated to the HID interface
             :param timeout:
             """
             start = time()
@@ -123,11 +127,9 @@ if os.name == "nt":
 
         @staticmethod
         def enumerate(vid, pid):
-            """
-            returns all the connected devices which matches PyWinUSB.vid/PyWinUSB.pid.
-            returns an array of PyWinUSB (Interface) objects
-            :param vid:
-            :param pid:
+            """ Get an array of all connected devices which matches PyWinUSB.vid/PyWinUSB.pid.
+            :param vid: USB Vendor ID
+            :param pid: USB Product ID
             """
             all_devices = hid.find_all_hid_devices()
 
@@ -168,6 +170,7 @@ else:
     except:
         raise Exception("PyUSB is required on a Linux Machine")
 
+
     class RawHID(RawHidBase):
         """
         This class provides basic functions to access
@@ -188,7 +191,7 @@ else:
 
         def open(self):
             """ open the interface """
-            logging.debug("Opening USB interface")
+            logging.debug("Open USB interface")
 
         def close(self):
             """ close the interface """
@@ -201,8 +204,10 @@ else:
                 pass
 
         def write(self, id, data, size=36):
-            """
-            write data on the OUT endpoint associated to the HID interface
+            """ Write data on the OUT endpoint associated to the HID interface
+            :param id: HID packet ID
+            :param data: HID packet data
+            :param size: HID packet size
             """
             rawdata = self._encode_packet(id, data, size)
             logging.debug('USB-OUT[0x]: %s', atos(rawdata))
@@ -210,28 +215,26 @@ else:
             if self.ep_out:
                 self.ep_out.write(rawdata)
             else:
-                bmRequestType = 0x21       #Host to device request of type Class of Recipient Interface
-                bmRequest = 0x09           #Set_REPORT (HID class-specific request for transferring data over EP0)
-                wValue = 0x200             #Issuing an OUT report
-                wIndex = self.intf_number  #Interface number for HID
+                bmRequestType = 0x21       # Host to device request of type Class of Recipient Interface
+                bmRequest = 0x09           # Set_REPORT (HID class-specific request for transferring data over EP0)
+                wValue = 0x200             # Issuing an OUT report
+                wIndex = self.intf_number  # Interface number for HID
                 self.dev.ctrl_transfer(bmRequestType, bmRequest, wValue + id, wIndex, rawdata)
 
         def read(self, timeout=1000):
+            """ Read data from IN endpoint associated to the HID interface
+            :param timeout:
             """
-            read data on the IN endpoint associated to the HID interface
-            """
-            #rawdata = self.ep_in.read(self.ep_in.wMaxPacketSize, timeout)
+            # rawdata = self.ep_in.read(self.ep_in.wMaxPacketSize, timeout)
             rawdata = self.ep_in.read(36, timeout)
             logging.debug('USB-IN [0x]: %s', atos(rawdata))
             return self._decode_packet(rawdata)
 
         @staticmethod
         def enumerate(vid, pid):
-            """
-            returns all the connected devices which matches PyUSB.vid/PyUSB.pid.
-            returns an array of PyUSB (Interface) objects
-            :param vid:
-            :param pid:
+            """ Get an array of all connected devices which matches PyUSB.vid/PyUSB.pid.
+            :param vid: USB Vendor ID
+            :param pid: USB Product ID
             """
             # find all devices matching the vid/pid specified
             all_devices = usb.core.find(find_all=True, idVendor=vid, idProduct=pid)
@@ -252,7 +255,7 @@ else:
 
                 # iterate on all interfaces:
                 for interface in config:
-                    if interface.bInterfaceClass == 0x03: # HID Interface
+                    if interface.bInterfaceClass == 0x03:  # HID Interface
                         interface_number = interface.bInterfaceNumber
                         break
 
@@ -278,13 +281,6 @@ else:
                     else:
                         ep_out = ep
 
-                if usb.__version__ == '1.0.0b1':
-                    vendor_name = usb.util.get_string(dev, 64, 1)
-                    product_name = usb.util.get_string(dev, 64, 2)
-                else:
-                    vendor_name = usb.util.get_string(dev, 1)
-                    product_name = usb.util.get_string(dev, 2)
-
                 if not ep_in:
                     logging.error('Endpoints not found')
                     return None
@@ -296,11 +292,8 @@ else:
                 new_target.vid = vid
                 new_target.pid = pid
                 new_target.intf_number = interface_number
-                new_target.vendor_name = vendor_name
-                new_target.product_name = product_name
+                new_target.vendor_name = usb.util.get_string(dev, 1).strip('\0')
+                new_target.product_name = usb.util.get_string(dev, 2).strip('\0')
                 targets.append(new_target)
 
             return targets
-
-
-

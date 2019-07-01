@@ -5,7 +5,7 @@ pyMBoot
 [![PyPI Status](https://img.shields.io/pypi/v/mboot.svg)](https://pypi.python.org/pypi/mboot)
 [![Python Version](https://img.shields.io/pypi/pyversions/mboot.svg)](https://www.python.org)
 
-pyMBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers with
+pyMBoot is an Open Source python based library for configuring and upgrading the firmware in NXP Microcontrolers via
 embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-development-tools/mcuxpresso-software-and-tools/mcuboot-mcu-bootloader-for-nxp-microcontrollers:MCUBOOT)
 (MCU Bootloader). Detailed description of `MCUBOOT / KBOOT` key features and functionality is located [here](https://freescale.jiveon.com/docs/DOC-104512).
 
@@ -66,13 +66,20 @@ The following example is showing how to use `mboot` module in your code.
         devs = mboot.scan_usb()
 
         if devs:
+            index = 0
+            
             if len(devs) > 1:
                 # Print list of connected devices
                 for i, dev in enumerate(devs):
                     print("{}) {}".format(i, dev.info()))
-                    
-            # Connect to first USB device from all founded
-            mb.open_usb(devs[0])
+                # Select one from all connected devices
+                print('Select: ', end='', flush=True)
+                c = input()
+                print()
+                index = int(c, 10)
+                
+            # Connect to USB device
+            mb.open_usb(devs[index])
 
             # Read MCU memory: 100 bytes from address 0
             data = mb.read_memory(start_address=0, length=100)
