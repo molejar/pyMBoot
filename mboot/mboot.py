@@ -240,7 +240,7 @@ class McuBoot(object):
         # Parse and validate status flag
         status = self._parse_status(rxpkg)
         if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
+            if status in StatusCode:
                 logging.info('RX-CMD: %s', StatusCode[status])
                 raise McuBootCommandError(errname=StatusCode[status], errval=status)
             else:
@@ -269,7 +269,7 @@ class McuBoot(object):
 
             if rep_id != self.HID_REPORT['DATA_IN']:
                 status = self._parse_status(pkg)
-                if StatusCode.is_valid(status):
+                if status in StatusCode:
                     logging.info('RX-DATA: %s' % StatusCode.desc(status))
                     raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
                 else:
@@ -296,7 +296,7 @@ class McuBoot(object):
         # Parse and validate status flag
         status = self._parse_status(pkg)
         if status != StatusCode.SUCCESS:
-            if StatusCode.is_valid(status):
+            if status in StatusCode:
                 logging.info('RX-DATA: %s' % StatusCode.desc(status))
                 raise McuBootDataError(mode='read', errname=StatusCode.desc(status), errval=status)
             else:
@@ -509,7 +509,10 @@ class McuBoot(object):
         :param ext_mem_identifier:
         :return {dict} with 'RAW' and 'STRING/LIST' value
         """
-        logging.info('TX-CMD: GetProperty->%s', PropertyTag[prop_tag])
+        if prop_tag in PropertyTag:
+            logging.info('TX-CMD: GetProperty->%s', PropertyTag[prop_tag])
+        else:
+            logging.info('TX-CMD: GetProperty(%d)', prop_tag)
         # Prepare GetProperty command
         if ext_mem_identifier is None:
             cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
