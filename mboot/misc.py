@@ -7,18 +7,14 @@
 from string import printable
 
 
-def size_fmt(value, use_kibibyte=True):
-    """ Convert integer value to string with size mark
-    :param value:
-    :param use_kibibyte:
-    :return:
-    """
-    base, suffix = [(1000., 'B'), (1024., 'iB')][use_kibibyte]
+def size_fmt(num, kibibyte=True):
+    base, suffix = [(1000., 'B'), (1024., 'iB')][kibibyte]
     for x in ['B'] + [x + suffix for x in list('kMGTP')]:
-        if -base < value < base:
+        if -base < num < base:
             break
-        value /= base
-    return "{0:3.1f} {1:s}".format(value, x)
+        num /= base
+
+    return "{} {}".format(num, x) if x == 'B' else "{:3.1f} {}".format(num, x)
 
 
 def atos(data, separator=' ', fmt='02X'):

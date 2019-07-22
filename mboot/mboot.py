@@ -19,36 +19,75 @@ from .usb import RawHID
 # Helper functions
 ########################################################################################################################
 
-def decode_property_value(property_tag, raw_value):
+def decode_property_value(property_tag, raw_values):
 
-    if property_tag == PropertyTag.CURRENT_VERSION:
+    if property_tag in (PropertyTag.CURRENT_VERSION, PropertyTag.TARGET_VERSION):
+        raw_value = raw_values[0]
         str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
 
     elif property_tag == PropertyTag.AVAILABLE_PERIPHERALS:
+        raw_value = raw_values[0]
         str_value = []
         for key, value in McuBoot.INTERFACES.items():
             if value[0] & raw_value:
                 str_value.append(key)
 
-    elif property_tag == PropertyTag.FLASH_SECURITY_STATE:
-        str_value = 'Unlocked' if raw_value == 0 else 'Locked'
-
     elif property_tag == PropertyTag.AVAILABLE_COMMANDS:
+        raw_value = raw_values[0]
         str_value = []
         for name, value, desc in CommandTag:
             if (1 << value) & raw_value:
                 str_value.append(name)
 
+    elif property_tag == PropertyTag.FLASH_SECURITY_STATE:
+        security_state = {0x00000000: 'Unlocked', 0x00000001: 'Locked', 0x5AA55AA5: 'Unlocked', 0xC33CC33C: 'Locked'}
+        if raw_values[0] in security_state:
+            str_value = security_state[raw_values[0]]
+        else:
+            str_value = "Unknown (0x{:08X})".format(raw_values[0])
+
     elif property_tag in (PropertyTag.MAX_PACKET_SIZE, PropertyTag.FLASH_SECTOR_SIZE,
                           PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE):
-        str_value = size_fmt(raw_value)
+        str_value = size_fmt(raw_values[0])
 
-    elif property_tag in (PropertyTag.RAM_START_ADDRESS, PropertyTag.FLASH_START_ADDRESS,
-                          PropertyTag.SYSTEM_DEVICE_IDENT):
-        str_value = '0x{:08X}'.format(raw_value)
+    elif property_tag in (PropertyTag.FLASH_ACCESS_SEGMENT_COUNT, PropertyTag.FLASH_BLOCK_COUNT,
+                          PropertyTag.VALIDATE_REGIONS):
+        str_value = '{:d}'.format(raw_values[0])
+
+    elif property_tag == PropertyTag.VERIFY_WRITES:
+        str_value = 'ON' if raw_values[0] else 'OFF'
+
+    elif property_tag == PropertyTag.UNIQUE_DEVICE_IDENT:
+        str_value = ''
+        for raw_value in raw_values:
+            str_value += '{:04X} {:04X} '.format((raw_value >> 16) & 0xFFFF, raw_value & 0xFFFF)
+
+    elif property_tag == PropertyTag.RESERVED_REGIONS:
+        if raw_values:
+            str_value = []
+            region_index = 0
+            for i in range(0, len(raw_values), 2):
+
+                str_value.append('[{}]: 0x{:08X} - 0x{:08X} ({})'.format(region_index,
+                                                                         raw_values[i],
+                                                                         raw_values[i+1],
+                                                                         size_fmt(raw_values[i+1] - raw_values[i])))
+                region_index += 1
+        else:
+            str_value = 'No reserved regions'
+
+    elif property_tag == PropertyTag.FLASH_READ_MARGIN:
+        margin_info = {0: "Normal", 1: "User", 2: "Factory"}
+        if raw_values[0] in margin_info:
+            str_value = margin_info[raw_values[0]]
+        else:
+            str_value = "Unknown ({})".format(raw_values[0])
 
     else:
-        str_value = '{:d}'.format(raw_value)
+        if len(raw_values) > 1:
+            str_value = ', '.join('0x{:08X}'.format(raw_value) for raw_value in raw_values)
+        else:
+            str_value = '0x{:08X}'.format(raw_values[0])
 
     return str_value
 
@@ -200,7 +239,7 @@ class McuBoot(object):
 
     @staticmethod
     def _parse_value(data):
-        return unpack_from('<I', data, 8)[0]
+        return unpack_from('<I', data, 8)
 
     def _process_cmd(self, data, timeout=1000):
         """Process Command Data
@@ -507,7 +546,7 @@ class McuBoot(object):
         """ MBoot: Get value of specified property
         :param prop_tag: The property ID (see Property enumerator)
         :param ext_mem_identifier:
-        :return {dict} with 'RAW' and 'STRING/LIST' value
+        :return list
         """
         if prop_tag in PropertyTag:
             logging.info('TX-CMD: GetProperty->%s', PropertyTag[prop_tag])
@@ -520,10 +559,11 @@ class McuBoot(object):
             cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, ext_mem_identifier)
         # Process GetProperty command
         rx_packet = self._process_cmd(cmd)
-        # Parse property value
-        raw_value = self._parse_value(rx_packet)
-        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_value))
-        return raw_value
+        # Parse property values
+        values_format = '<{:d}I'.format(int((len(rx_packet) - 8) / 4))
+        raw_values = unpack_from(values_format, rx_packet, 8)
+        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_values))
+        return raw_values
 
     def set_property(self, prop_tag, value):
         """ MBoot: Set value of specified property

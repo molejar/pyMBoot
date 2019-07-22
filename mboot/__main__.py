@@ -314,7 +314,7 @@ def write(ctx, address, offset, file):
         # Connect MBoot USB device
         mb.open_usb(hid_dev)
         # Read Flash Sector Size of connected MCU
-        flash_sector_size = mb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)
+        flash_sector_size = mb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)[0]
 
         # Align Erase Start Address and Len to Flash Sector Size
         start_address = (address & ~(flash_sector_size - 1))
@@ -366,7 +366,7 @@ def read(ctx, address, length, compress, file):
         mb.open_usb(hid_dev)
         if ctx.obj['DEBUG']: click.echo()
         if length is None:
-            size = mb.get_property(mboot.PropertyTag.FLASH_SIZE)
+            size = mb.get_property(mboot.PropertyTag.FLASH_SIZE)[0]
             if address > (size - 1):
                 raise Exception("LENGTH argument is required for non FLASH access !")
             length = size - address
@@ -429,7 +429,7 @@ def erase(ctx, address, length, mass):
             # Connect MBoot USB device
             mb.open_usb(hid_dev)
             # Get available commands
-            commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)
+            commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)[0]
             # Call MBoot flash erase all function
             if mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
                 mb.flash_erase_all_unsecure()
