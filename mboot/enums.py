@@ -104,6 +104,11 @@ class StatusCode(Enum):
     FLASH_PROTECTION_VIOLATION = (104, 'FlashProtectionViolation', 'FLASH Driver: Protection Violation')
     FLASH_COMMAND_FAILURE = (105, 'FlashCommandFailure', 'FLASH Driver: Command Failure')
     FLASH_UNKNOWN_PROPERTY = (106, 'FlashUnknownProperty', 'FLASH Driver: Unknown Property')
+    FLASH_REGION_EXECUTE_ONLY = (108, 'FlashRegionExecuteOnly', 'FLASH Driver: Region Execute Only')
+    FLASH_EXEC_IN_RAM_NOT_READY = (109, 'FlashExecuteInRamFunctionNotReady',
+                                   'FLASH Driver: Execute In Ram Function Not Ready')
+    FLASH_COMMAND_NOT_SUPPORTED = (111, 'FlashCommandNotSupported', 'FLASH Driver: Command Not Supported')
+    FLASH_OUT_OF_DATE_CFPA_PAGE = (132, 'FlashOutOfDateCfpaPage', 'FLASH Driver: Out Of Date CFPA Page')
 
     # I2C driver errors.
     I2C_SLAVE_TX_UNDERRUN = (200, 'I2cSlaveTxUnderrun', 'I2C Driver: Slave Tx Underrun')
@@ -114,7 +119,7 @@ class StatusCode(Enum):
     SPI_SLAVE_TX_UNDERRUN = (300, 'SpiSlaveTxUnderrun', 'SPI Driver: Slave Tx Underrun')
     SPI_SLAVE_RX_OVERRUN = (301, 'SpiSlaveRxOverrun', 'SPI Driver: Slave Rx Overrun')
 
-    # QuadSPI driver errors
+    # QuadSPI driver errors.
     QSPI_FLASH_SIZE_ERROR = (400, 'QspiFlashSizeError', 'QSPI Driver: Flash Size Error')
     QSPI_FLASH_ALIGNMENT_ERROR = (401, 'QspiFlashAlignmentError', 'QSPI Driver: Flash Alignment Error')
     QSPI_FLASH_ADDRESS_ERROR = (402, 'QspiFlashAddressError', 'QSPI Driver: Flash Address Error')
@@ -122,6 +127,16 @@ class StatusCode(Enum):
     QSPI_FLASH_UNKNOWN_PROPERTY = (404, 'QspiFlashUnknownProperty', 'QSPI Driver: Flash Unknown Property')
     QSPI_NOT_CONFIGURED = (405, 'QspiNotConfigured', 'QSPI Driver: Not Configured')
     QSPI_COMMAND_NOT_SUPPORTED = (406, 'QspiCommandNotSupported', 'QSPI Driver: Command Not Supported')
+    QSPI_COMMAND_TIMEOUT = (407, 'QspiCommandTimeout', 'QSPI Driver: Command Timeout')
+    QSPI_WRITE_FAILURE = (408, 'QspiWriteFailure', 'QSPI Driver: Write Failure')
+
+    # OTFAD driver errors.
+    OTFAD_SECURITY_VIOLATION = (500, 'OtfadSecurityViolation', 'OTFAD Driver: Security Violation')
+    OTFAD_LOGICALLY_DISABLED = (501, 'OtfadLogicallyDisabled', 'OTFAD Driver: Logically Disabled')
+    OTFAD_INVALID_KEY = (502, 'OtfadInvalidKey', 'OTFAD Driver: Invalid Key')
+    OTFAD_INVALID_KEY_BLOB = (503, 'OtfadInvalidKeyBlob', 'OTFAD Driver: Invalid Key Blob')
+
+    # SDMMC driver errors.
 
     # Bootloader errors.
     UNKNOWN_COMMAND = (10000, 'UnknownCommand', 'Unknown Command')

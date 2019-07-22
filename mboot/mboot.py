@@ -239,7 +239,7 @@ class McuBoot(object):
 
     @staticmethod
     def _parse_value(data):
-        return unpack_from('<I', data, 8)
+        return unpack_from('<I', data, 8)[0]
 
     def _process_cmd(self, data, timeout=1000):
         """Process Command Data
