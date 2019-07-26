@@ -122,13 +122,21 @@ individual commands just use `mboot <command name> -?`.
       -?, --help                 Show this message and exit.
     
     Commands:
-      erase   Erase MCU memory
-      fill    Fill MCU memory with specified patern
-      info    Get MCU info (mboot properties)
-      read    Read data from MCU memory
-      reset   Reset MCU
-      unlock  Unlock MCU
-      write   Write data into MCU memory
+      call     Call code at address with specified argument
+      efuse    Read/Write eFuse from MCU
+      erase    Erase MCU memory
+      execute  Execute code at address with specified argument and stackpointer
+      fill     Fill MCU memory with specified pattern
+      info     Get MCU info (mboot properties)
+      memconf  Configure external memory
+      memlist  Get list of available memories
+      read     Read data from MCU memory
+      reset    Reset MCU
+      sbfile   Receive SB file
+      unlock   Unlock MCU
+      update   Copy backup app from address to main app region
+      write    Write data into MCU memory
+
 ```
 
 > If USB device is not in known devices list, then use `-t or --target` argument and directly specify the device VID:PID. Example: **-t 0x15A2:0x0073**
@@ -145,7 +153,7 @@ Read bootloader properties from connected MCU.
  DEVICE: Kinetis Bootloader (0x15A2, 0x0073)
 
  CurrentVersion:
-  = 1.0.0
+  = K1.0.0
  AvailablePeripherals:
   - UART
   - I2C-Slave
@@ -154,9 +162,9 @@ Read bootloader properties from connected MCU.
  FlashStartAddress:
   = 0x00000000
  FlashSize:
-  = 256kB
+  = 256.0 kiB
  FlashSectorSize:
-  = 1kB
+  = 1.0 kiB
  FlashBlockCount:
   = 2
  AvailableCommands:
@@ -170,17 +178,18 @@ Read bootloader properties from connected MCU.
   - Reset
   - SetProperty
  VerifyWrites:
-  = 1
+  = ON
  MaxPacketSize:
-  = 32B
+  = 32 B
  ReservedRegions:
-  = 0
+  - [0]: 0x00000000 - 0x00000000 (0 B)
+  - [1]: 0x1FFFF800 - 0x20000687 (3.6 kiB)
  ValidateRegions:
   = 1
  RAMStartAddress:
   = 0x1FFFE000
  RAMSize:
-  = 32kB
+  = 32.0 kiB
  SystemDeviceIdent:
   = 0x23161D82
  FlashSecurityState:

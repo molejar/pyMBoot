@@ -34,13 +34,10 @@ class CommandTag(Enum):
     RELIABLE_UPDATE = (0x12, 'ReliableUpdate', 'Reliable Update')
     GENERATE_KEY_BLOB = (0x13, 'GenerateKeyBlob', 'Generate Key Blob')
     KEY_PROVISIONING = (0x15, 'KeyProvisioning', 'Key Provisioning')
-    LOAD_IMAGE = (0x16, 'LoadImage', 'Load Image')
-
-    GENERIC_RESPONSE = (0xA0, 'GenericResponse', 'Generic Response')
-    FLASH_READ_ONCE_RESPONSE = (0xAF, 'FlashReadOnceResponse', 'Flash Read Once Response')
-    FLASH_READ_RESOURCE_RESPONSE = (0xB0, 'FlashReadResourceResponse', 'Flash Read Resource Response')
-    GENERATE_KEY_BLOB_RESPONSE = (0xB3, 'GenerateKeyBlobResponse', 'Generate Key Blob Response')
-    KEY_PROVISIONING_RESPONSE = (0xB5, 'KeyProvisionResponse', 'Key Provision Response')
+    # reserved commands
+    CONFIGURE_I2C = (0xC1, 'ConfigureI2c', 'Configure I2C')
+    CONFIGURE_SPI = (0xC2, 'ConfigureI2c', 'Configure SPI')
+    CONFIGURE_CAN = (0xC3, 'ConfigureCan', 'Configure CAN')
 
 
 ########################################################################################################################
@@ -171,6 +168,8 @@ class StatusCode(Enum):
     MEMORY_RANGE_INVALID = (10200, 'MemoryRangeInvalid', 'Memory Range Invalid')
     MEMORY_READ_FAILED = (10201, 'MemoryReadFailed', 'Memory Read Failed')
     MEMORY_WRITE_FAILED = (10202, 'MemoryWriteFailed', 'Memory Write Failed')
+    MEMORY_CUMULATIVE_WRITE = (10203, 'MemoryCumulativeWrite', 'Memory Cumulative Write')
+    MEMORY_NOT_CONFIGURED = (10205, 'MemoryNotConfigured', 'Memory Not Configured')
 
     # Property store errors.
     UNKNOWN_PROPERTY = (10300, 'UnknownProperty', 'Unknown Property')
@@ -183,3 +182,39 @@ class StatusCode(Enum):
     APP_CRC_CHECK_INACTIVE = (10402, 'AppCrcCheckInactive', 'Application CRC Check: Inactive')
     APP_CRC_CHECK_INVALID = (10403, 'AppCrcCheckInvalid', 'Application CRC Check: Invalid')
     APP_CRC_CHECK_OUT_OF_RANGE = (10404, 'AppCrcCheckOutOfRange', 'Application CRC Check: Out Of Range')
+
+
+########################################################################################################################
+# McuBoot Memory ID
+########################################################################################################################
+
+class ExtMemId(Enum):
+    """ McuBoot External Memory Property Tags """
+
+    QUAD_SPI0 = (1, 'QuadSPI', 'Quad SPI Memory 0')
+    IFR0 = (4, 'Nonvolatile information register 0 (only used by SB loader)')
+    SEMC_NOR = (8, 'SEMC NOR Memory')
+    FLEX_SPI_NOR = (9, 'Flex SPI NOR Memory')
+    SPIFI_NOR = (10, 'SPIFI NOR Memory')
+    FLASH_EXECUTE_ONLY = (16, 'Execute-Only region on internal Flash')
+    SEMC_NAND = (256, 'SEMC NAND Memory')
+    SPI_NAND = (257, 'SPI NAND Memory')
+    SPI_NOR_EEPROM = (272, 'SPI NOR/EEPROM Memory')
+    I2C_NOR_EEPROM = (273, 'I2C NOR/EEPROM Memory')
+    SD_CARD = (288, 'eSD, SD, SDHC, SDXC Memory Card')
+    MMC_CARD = (289, 'MMC, eMMC Memory Card')
+
+
+########################################################################################################################
+# McuBoot External Memory Property Tags
+########################################################################################################################
+
+class ExtMemPropTags(Enum):
+    """ McuBoot External Memory Property Tags """
+
+    INIT_STATUS = 0x00000000
+    START_ADDRESS = 0x00000001
+    SIZE_IN_KBYTES = 0x00000002
+    PAGE_SIZE = 0x00000004
+    SECTOR_SIZE = 0x00000008
+    BLOCK_SIZE = 0x00000010

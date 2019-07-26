@@ -66,7 +66,7 @@ if os.name == "nt":
         raise Exception("PyWinUSB is required on a Windows Machine")
 
 
-    class RawHID(RawHidBase):
+    class RawHid(RawHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pywinusb:
@@ -147,7 +147,7 @@ if os.name == "nt":
                     dev.close()
 
                     if report:
-                        new_target = RawHID()
+                        new_target = RawHid()
                         new_target.report = report
                         new_target.vendor_name = dev.vendor_name
                         new_target.product_name = dev.product_name
@@ -171,7 +171,7 @@ else:
         raise Exception("PyUSB is required on a Linux Machine")
 
 
-    class RawHID(RawHidBase):
+    class RawHid(RawHidBase):
         """
         This class provides basic functions to access
         a USB HID device using pyusb:
@@ -285,7 +285,7 @@ else:
                     logging.error('Endpoints not found')
                     return None
 
-                new_target = RawHID()
+                new_target = RawHid()
                 new_target.ep_in = ep_in
                 new_target.ep_out = ep_out
                 new_target.dev = dev

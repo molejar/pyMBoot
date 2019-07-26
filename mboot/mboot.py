@@ -9,21 +9,118 @@ import logging
 from struct import pack, unpack_from
 
 # relative imports
-from .enums import CommandTag, PropertyTag, StatusCode
+from .enums import CommandTag, PropertyTag, StatusCode, ExtMemPropTags, ExtMemId
 from .misc import atos, size_fmt
 from .uart import UART
-from .usb import RawHID
+from .usb import RawHid
 
 
 ########################################################################################################################
-# Helper functions
+# McuBoot helper classes
 ########################################################################################################################
 
-def decode_property_value(property_tag, raw_values):
+class Version:
+    """ McuBoot version type """
+
+    def __init__(self, *args, **kwargs):
+        self.mark = kwargs.get('mark', None)
+        self.major = kwargs.get('major', 0)
+        self.minor = kwargs.get('minor', 0)
+        self.fixation = kwargs.get('fixation', 0)
+        if args:
+            value = args[0]
+            if isinstance(value, int):
+                mark = (value >> 24) & 0xFF
+                self.mark = chr(mark) if 64 < mark < 91 else None
+                self.major = (value >> 16) & 0xFF
+                self.minor = (value >> 8) & 0xFF
+                self.fixation = value & 0xFF
+            elif isinstance(value, str):
+                mark_major, minor, fixation = value.split('.')
+                if len(mark_major) > 1 and mark_major[0] not in "0123456789":
+                    self.mark = mark_major[0]
+                    self.major = int(mark_major[1:])
+                else:
+                    self.major = int(mark_major)
+                self.minor = int(minor)
+                self.fixation = int(fixation)
+            else:
+                raise ValueError()
+
+    def __eq__(self, obj):
+        if not isinstance(obj, Version):
+            return False
+        if self.mark != obj.mark or self.major != obj.major or self.minor != obj.minor or self.fixation != obj.fixation:
+            return False
+        return True
+
+    def __ne__(self, obj):
+        return not self.__eq__(obj)
+
+    def __lt__(self, obj):
+        if self.major < obj.major:
+            return True
+        if self.minor < obj.minor:
+            return True
+        if self.fixation < obj.fixation:
+            return True
+        return False
+
+    def __le__(self, obj):
+        if self.major <= obj.major:
+            return True
+        if self.minor <= obj.minor:
+            return True
+        if self.fixation <= obj.fixation:
+            return True
+        return False
+
+    def __gt__(self, obj):
+        if self.major > obj.major:
+            return True
+        if self.minor > obj.minor:
+            return True
+        if self.fixation > obj.fixation:
+            return True
+        return False
+
+    def __ge__(self, obj):
+        if self.major >= obj.major:
+            return True
+        if self.minor >= obj.minor:
+            return True
+        if self.fixation >= obj.fixation:
+            return True
+        return False
+
+    def __repr__(self):
+        self.tostr()
+
+    def toraw(self):
+        value = self.major << 16 | self.minor << 8 | self.fixation
+        return value if self.mark is None else ord(self.mark) << 24 | value
+
+    def tostr(self):
+        value = "{}.{}.{}".format(self.major, self.minor, self.fixation)
+        return value if self.mark is None else self.mark + value
+
+
+########################################################################################################################
+# McuBoot helper functions
+########################################################################################################################
+
+def decode_property_value(property_tag, raw_values, ext_mem_id=None):
 
     if property_tag in (PropertyTag.CURRENT_VERSION, PropertyTag.TARGET_VERSION):
+        str_value = Version(raw_values[0]).tostr()
+
+    elif property_tag in (PropertyTag.CRC_CHECK_STATUS, PropertyTag.QSPI_INIT_STATUS,
+                          PropertyTag.RELIABLE_UPDATE_STATUS):
         raw_value = raw_values[0]
-        str_value = "{0:d}.{1:d}.{2:d}".format((raw_value >> 16) & 0xFF, (raw_value >> 8) & 0xFF, raw_value & 0xFF)
+        if raw_value in StatusCode:
+            str_value = StatusCode[raw_value]
+        else:
+            str_value = 'Unknown Status Code: 0x{:08X}'.format(raw_value)
 
     elif property_tag == PropertyTag.AVAILABLE_PERIPHERALS:
         raw_value = raw_values[0]
@@ -35,7 +132,7 @@ def decode_property_value(property_tag, raw_values):
     elif property_tag == PropertyTag.AVAILABLE_COMMANDS:
         raw_value = raw_values[0]
         str_value = []
-        for name, value, desc in CommandTag:
+        for name, value, _ in CommandTag:
             if (1 << value) & raw_value:
                 str_value.append(name)
 
@@ -47,7 +144,7 @@ def decode_property_value(property_tag, raw_values):
             str_value = "Unknown (0x{:08X})".format(raw_values[0])
 
     elif property_tag in (PropertyTag.MAX_PACKET_SIZE, PropertyTag.FLASH_SECTOR_SIZE,
-                          PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE):
+                          PropertyTag.FLASH_SIZE, PropertyTag.RAM_SIZE, PropertyTag.FLASH_ACCESS_SEGMENT_SIZE):
         str_value = size_fmt(raw_values[0])
 
     elif property_tag in (PropertyTag.FLASH_ACCESS_SEGMENT_COUNT, PropertyTag.FLASH_BLOCK_COUNT,
@@ -57,6 +154,9 @@ def decode_property_value(property_tag, raw_values):
     elif property_tag == PropertyTag.VERIFY_WRITES:
         str_value = 'ON' if raw_values[0] else 'OFF'
 
+    elif property_tag == PropertyTag.FLASH_FAC_SUPPORT:
+        str_value = 'SUPPORTED' if raw_values[0] else 'UNSUPPORTED'
+
     elif property_tag == PropertyTag.UNIQUE_DEVICE_IDENT:
         str_value = ''
         for raw_value in raw_values:
@@ -65,14 +165,9 @@ def decode_property_value(property_tag, raw_values):
     elif property_tag == PropertyTag.RESERVED_REGIONS:
         if raw_values:
             str_value = []
-            region_index = 0
             for i in range(0, len(raw_values), 2):
-
-                str_value.append('[{}]: 0x{:08X} - 0x{:08X} ({})'.format(region_index,
-                                                                         raw_values[i],
-                                                                         raw_values[i+1],
+                str_value.append('[{}]: 0x{:08X} - 0x{:08X} ({})'.format(i//2, raw_values[i], raw_values[i+1],
                                                                          size_fmt(raw_values[i+1] - raw_values[i])))
-                region_index += 1
         else:
             str_value = 'No reserved regions'
 
@@ -83,9 +178,58 @@ def decode_property_value(property_tag, raw_values):
         else:
             str_value = "Unknown ({})".format(raw_values[0])
 
+    elif property_tag == PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES:
+        str_value = []
+
+        prop_tags = raw_values[0]
+        mem_start_address = raw_values[1]
+        mem_size_in_kbytes = raw_values[2]
+        mem_page_size = raw_values[3]
+        mem_sector_size = raw_values[4]
+        mem_block_size = raw_values[5]
+
+        if prop_tags > 0 and ext_mem_id is not None:
+            str_value.append(ExtMemId.desc(ext_mem_id) if ext_mem_id in ExtMemId else
+                             'Unknown Memory, ID: 0x{:08X}'.format(ext_mem_id))
+
+        if prop_tags & ExtMemPropTags.START_ADDRESS:
+            str_value.append('Start Address = 0x{:08X}'.format(mem_start_address))
+
+        if prop_tags & ExtMemPropTags.SIZE_IN_KBYTES:
+            str_value.append('Total Size = {}'.format(size_fmt(mem_size_in_kbytes * 1024)))
+
+        if prop_tags & ExtMemPropTags.PAGE_SIZE:
+            str_value.append('Page Size = {}'.format(size_fmt(mem_page_size)))
+
+        if prop_tags & ExtMemPropTags.SECTOR_SIZE:
+            str_value.append('Sector Size = {}'.format(size_fmt(mem_sector_size)))
+
+        if prop_tags & ExtMemPropTags.BLOCK_SIZE:
+            str_value.append('Block Size = {}'.format(size_fmt(mem_block_size)))
+
+    elif property_tag == PropertyTag.IRQ_NOTIFIER_PIN:
+        pin = raw_values[0] & 0xFF
+        port = (raw_values[0] >> 8) & 0xFF
+        enabled = True if raw_values[0] & (1 << 32) else False
+
+        if enabled:
+            str_value = "Irq pin is enabled, using GPIO port[{}], pin[{}]".format(port, pin)
+        else:
+            str_value = "Irq pin is disabled"
+
+    elif property_tag == PropertyTag.PFR_KEYSTORE_UPDATE_OPT:
+        str_value = "FFR KeyStore Update is "
+
+        if raw_values[0] == 0:
+            str_value += "Key Provisioning"
+        elif raw_values[0] == 1:
+            str_value += "Write Memory"
+        else:
+            str_value += "UnKnow Option"
+
     else:
         if len(raw_values) > 1:
-            str_value = ', '.join('0x{:08X}'.format(raw_value) for raw_value in raw_values)
+            str_value = ['0x{:08X}'.format(raw_value) for raw_value in raw_values]
         else:
             str_value = '0x{:08X}'.format(raw_values[0])
 
@@ -173,16 +317,16 @@ def scan_usb(device_name=None):
 
     if device_name is None:
         for name, value in DEVICES.items():
-            devices += RawHID.enumerate(value[0], value[1])
+            devices += RawHid.enumerate(value[0], value[1])
     else:
         if ':' in device_name:
             vid, pid = device_name.split(':')
-            devices = RawHID.enumerate(int(vid, 0), int(pid, 0))
+            devices = RawHid.enumerate(int(vid, 0), int(pid, 0))
         else:
             if device_name in DEVICES:
                 vid = DEVICES[device_name][0]
                 pid = DEVICES[device_name][1]
-                devices = RawHID.enumerate(vid, pid)
+                devices = RawHid.enumerate(vid, pid)
     return devices
 
 
@@ -245,6 +389,7 @@ class McuBoot(object):
         """Process Command Data
         :rtype : object
         """
+
         if self._usb_dev is None and self._uart_dev is None:
             logging.info('RX-CMD: USB Disconnected')
             raise McuBootConnectionError('USB Disconnected')
@@ -447,7 +592,7 @@ class McuBoot(object):
 
     def get_mcu_info(self):
         """ MBoot: Get MCU info (available properties collection)
-        :return List of {dict}
+        :return dict
         """
         mcu_info = {}
         if self._usb_dev is None and self._uart_dev is None:
@@ -464,6 +609,122 @@ class McuBoot(object):
 
         return mcu_info
 
+    def get_memory_list(self):
+        """ MBoot: Get list of embedded memories
+        :return dict
+        """
+        memory_list = {}
+        if self._usb_dev is None and self._uart_dev is None:
+            logging.info('Disconnected !')
+            return None
+
+        # Internal FLASH
+        index = 0
+        value = 0
+        mdata = []
+        while True:
+            try:
+                start_address = self.get_property(PropertyTag.FLASH_START_ADDRESS, index)[0]
+
+                if index == 0:
+                    value = start_address
+                elif value == start_address:
+                    break
+
+                flash_size = self.get_property(PropertyTag.FLASH_SIZE, index)[0]
+                flash_sector_size = self.get_property(PropertyTag.FLASH_SECTOR_SIZE, index)[0]
+
+                # store data
+                mdata.append({'address': start_address, 'size': flash_size, 'sector_size': flash_sector_size})
+                index += 1
+
+            except McuBootGenericError as e:
+                if e.get_error_value() == StatusCode.UNKNOWN_PROPERTY:
+                    break
+        if mdata:
+            memory_list['internal_flash'] = mdata
+
+        # Internal RAM
+        index = 0
+        value = 0
+        mdata = []
+        while True:
+            try:
+                start_address = self.get_property(PropertyTag.RAM_START_ADDRESS, index)[0]
+
+                if index == 0:
+                    value = start_address
+                elif value == start_address:
+                    break
+
+                ram_size = self.get_property(PropertyTag.RAM_SIZE, index)[0]
+                # store data
+                mdata.append({'address': start_address, 'size': ram_size})
+                index += 1
+
+            except McuBootGenericError as e:
+                if e.get_error_value() == StatusCode.UNKNOWN_PROPERTY:
+                    break
+        if mdata:
+            memory_list['internal_ram'] = mdata
+
+        # External Memories
+        ext_mem_list = []
+        ext_mem_ids = [id for _, id, _ in ExtMemId]
+
+        try:
+            current_version = self.get_property(PropertyTag.CURRENT_VERSION)[0]
+        except McuBootGenericError as e:
+            if e.get_error_value() == StatusCode.UNKNOWN_PROPERTY:
+                return memory_list
+
+        if Version(current_version) <= Version("2.0.0"):
+            # old versions mboot support only Quad SPI memory
+            ext_mem_ids = [ExtMemId.QUAD_SPI0]
+
+        for id in ext_mem_ids:
+            try:
+                mem_attrs = {}
+                raw_values = self.get_property(PropertyTag.EXTERNAL_MEMORY_ATTRIBUTES, id)
+                # memory ID and name
+                mem_attrs['mem_id'] = id
+                mem_attrs['mem_name'] = ExtMemId[id]
+                # parse memory attributes
+                if raw_values[0] & ExtMemPropTags.START_ADDRESS:
+                    mem_attrs['address'] = raw_values[1]
+                if raw_values[0] & ExtMemPropTags.SIZE_IN_KBYTES:
+                    mem_attrs['size'] = raw_values[2] * 1024
+                if raw_values[0] & ExtMemPropTags.PAGE_SIZE:
+                    mem_attrs['page_size'] = raw_values[3]
+                if raw_values[0] & ExtMemPropTags.SECTOR_SIZE:
+                    mem_attrs['sector_size'] = raw_values[4]
+                if raw_values[0] & ExtMemPropTags.BLOCK_SIZE:
+                    mem_attrs['block_size'] = raw_values[5]
+                # store attributes
+                ext_mem_list.append(mem_attrs)
+
+            except McuBootGenericError as e:
+                if e.get_error_value() == StatusCode.UNKNOWN_PROPERTY:
+                    # No external memories are supported by current device.
+                    break
+                elif e.get_error_value() == StatusCode.INVALID_ARGUMENT:
+                    # Current memory type is not supported by the device, skip to next external memory.
+                    pass
+                elif e.get_error_value() == StatusCode.QSPI_NOT_CONFIGURED:
+                    # QSPI0 is not supported, skip to next external memory.
+                    pass
+                elif e.get_error_value() == StatusCode.MEMORY_NOT_CONFIGURED:
+                    # Un-configured external memory, skip to next external memory.
+                    pass
+                elif e.get_error_value() != StatusCode.SUCCESS:
+                    # Other Error
+                    break
+
+        if ext_mem_list:
+            memory_list['external_mems'] = ext_mem_list
+
+        return memory_list
+
     def flash_erase_all(self):
         """ MBoot: Erase complete flash memory without recovering flash security section
         """
@@ -473,58 +734,58 @@ class McuBoot(object):
         # Process FlashEraseAll command
         self._process_cmd(cmd)
 
-    def flash_erase_region(self, start_address, length):
+    def flash_erase_region(self, address, length):
         """ MBoot: Erase specified range of flash
-        :param start_address: Start address
+        :param address: Start address
         :param length: Count of bytes
         """
-        logging.info('TX-CMD: FlashEraseRegion [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        logging.info('TX-CMD: FlashEraseRegion [ address=0x%08X | length=%d  ]', address, length)
         # Prepare FlashEraseRegion command
-        cmd = pack('<4B2I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B2I', CommandTag.FLASH_ERASE_REGION, 0x00, 0x00, 0x02, address, length)
         # Process FlashEraseRegion command
         self._process_cmd(cmd, 5000)
 
-    def read_memory(self, start_address, length):
+    def read_memory(self, address, length):
         """ MBoot: Read data from MCU memory
-        :param start_address: Start address
+        :param address: Start address
         :param length: Count of bytes
         :return List of bytes
         """
         if length == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: ReadMemory [ StartAddr=0x%08X | len=%d  ]', start_address, length)
+        logging.info('TX-CMD: ReadMemory [ address=0x%08X | length=%d  ]', address, length)
         # Prepare ReadMemory command
-        cmd = pack('<4B2I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x02, start_address, length)
+        cmd = pack('<4B2I', CommandTag.READ_MEMORY, 0x00, 0x00, 0x02, address, length)
         # Process ReadMemory command
         self._process_cmd(cmd)
         # Process Read Data
         return self._read_data(length)
 
-    def write_memory(self, start_address, data):
+    def write_memory(self, address, data):
         """ MBoot: Write data into MCU memory
-        :param start_address: Start address
+        :param address: Start address
         :param data: List of bytes
         :return Count of wrote bytes
         """
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: WriteMemory [ StartAddr=0x%08X | len=%d  ]', start_address, len(data))
+        logging.info('TX-CMD: WriteMemory [ address=0x%08X | length=%d  ]', address, len(data))
         # Prepare WriteMemory command
-        cmd = pack('<4B2I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, start_address, len(data))
+        cmd = pack('<4B2I', CommandTag.WRITE_MEMORY, 0x00, 0x00, 0x03, address, len(data))
         # Process WriteMemory command
         self._process_cmd(cmd)
         # Process Write Data
         return self._send_data(data)
 
-    def fill_memory(self, start_address, length, pattern=0xFFFFFFFF):
+    def fill_memory(self, address, length, pattern=0xFFFFFFFF):
         """ MBoot: Fill MCU memory with specified pattern
-        :param start_address: Start address (must be word aligned)
+        :param address: Start address (must be word aligned)
         :param length: Count of words (must be word aligned)
         :param pattern: Count of wrote bytes
         """
-        logging.info('TX-CMD: FillMemory [ address=0x%08X | len=%d  | patern=0x%08X ]', start_address, length, pattern)
+        logging.info('TX-CMD: FillMemory [ address=0x%08X | length=%d | pattern=0x%08X ]', address, length, pattern)
         # Prepare FillMemory command
-        cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, start_address, length, pattern)
+        cmd = pack('<4B3I', CommandTag.FILL_MEMORY, 0x00, 0x00, 0x03, address, length, pattern)
         # Process FillMemory command
         self._process_cmd(cmd)
 
@@ -532,7 +793,7 @@ class McuBoot(object):
         """ MBoot: Disable flash security by backdoor key
         :param backdoor_key:
         """
-        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key [0x] = %s ]', atos(backdoor_key))
+        logging.info('TX-CMD: FlashSecurityDisable [ backdoor_key[0x] = %s ]', atos(backdoor_key))
         # Prepare FlashSecurityDisable command
         cmd = pack('4B', CommandTag.FLASH_SECURITY_DISABLE, 0x00, 0x00, 0x02)
         if len(backdoor_key) < 8:
@@ -542,10 +803,10 @@ class McuBoot(object):
         # Process FlashSecurityDisable command
         self._process_cmd(cmd)
 
-    def get_property(self, prop_tag, ext_mem_identifier=None):
+    def get_property(self, prop_tag, mem_index=0):
         """ MBoot: Get value of specified property
         :param prop_tag: The property ID (see Property enumerator)
-        :param ext_mem_identifier:
+        :param mem_index:
         :return list
         """
         if prop_tag in PropertyTag:
@@ -553,16 +814,14 @@ class McuBoot(object):
         else:
             logging.info('TX-CMD: GetProperty(%d)', prop_tag)
         # Prepare GetProperty command
-        if ext_mem_identifier is None:
-            cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
-        else:
-            cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, ext_mem_identifier)
+        # cmd = pack('<4BI', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x01, prop_tag)
+        cmd = pack('<4B2I', CommandTag.GET_PROPERTY, 0x00, 0x00, 0x02, prop_tag, mem_index)
         # Process GetProperty command
         rx_packet = self._process_cmd(cmd)
         # Parse property values
         values_format = '<{:d}I'.format(int((len(rx_packet) - 8) / 4))
         raw_values = unpack_from(values_format, rx_packet, 8)
-        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_values))
+        logging.info('RX-CMD: %s = %s', PropertyTag[prop_tag], decode_property_value(prop_tag, raw_values, mem_index))
         return raw_values
 
     def set_property(self, prop_tag, value):
@@ -582,7 +841,7 @@ class McuBoot(object):
         """
         if len(data) == 0:
             raise ValueError('Data len is zero')
-        logging.info('TX-CMD: Receive SB file [ len=%d ]', len(data))
+        logging.info('TX-CMD: Receive SB file [ length=%d ]', len(data))
         # Prepare WriteMemory command
         cmd = pack('<4BI', CommandTag.RECEIVE_SB_FILE, 0x00, 0x00, 0x02, len(data))
         # Process WriteMemory command
@@ -590,28 +849,26 @@ class McuBoot(object):
         # Process Write Data
         return self._send_data(data)
 
-    def execute(self, jump_address, argument, sp_address):
+    def execute(self, address, argument, sp):
         """ MBoot: Fill MCU memory with specified pattern
-        :param jump_address: Jump address (must be word aligned)
+        :param address: Jump address (must be word aligned)
         :param argument: Function arguments address
-        :param sp_address: Stack pointer address
+        :param sp: Stack pointer address
         """
-        logging.info('TX-CMD: Execute [ JumpAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', jump_address, argument,
-                     sp_address)
+        logging.info('TX-CMD: Execute [ address=0x%08X | argument=0x%08X | SP=0x%08X ]', address, argument, sp)
         # Prepare Execute command
-        cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, jump_address, argument, sp_address)
+        cmd = pack('<4B3I', CommandTag.EXECUTE, 0x00, 0x00, 0x03, address, argument, sp)
         # Process Execute command
         self._process_cmd(cmd)
 
-    def call(self, call_address, argument, sp_address):
+    def call(self, address, argument):
         """ MBoot: Fill MCU memory with specified pattern
-        :param call_address: Call address (must be word aligned)
+        :param address: Call address (must be word aligned)
         :param argument: Function arguments address
-        :param sp_address: Stack pointer address
         """
-        logging.info('TX-CMD: Call [ CallAddr=0x%08X | ARG=0x%08X  | SP=0x%08X ]', call_address, argument, sp_address)
+        logging.info('TX-CMD: Call [ address=0x%08X | argument=0x%08X ]', address, argument)
         # Prepare Call command
-        cmd = pack('<4B3I', CommandTag.CALL, 0x00, 0x00, 0x03, call_address, argument, sp_address)
+        cmd = pack('<4B2I', CommandTag.CALL, 0x00, 0x00, 0x02, address, argument)
         # Process Call command
         self._process_cmd(cmd)
 
@@ -635,52 +892,54 @@ class McuBoot(object):
         # Process FlashEraseAllUnsecure command
         self._process_cmd(cmd)
 
-    def flash_read_once(self, index, length):
+    def flash_read_once(self, index, byte_count=4):
         """ MBoot: Read from MCU flash program once region (max 8 bytes)
         :param index: Start index
-        :param length: Count of bytes
+        :param byte_count: Count of bytes
         :return List of bytes
         """
-        if (index + length) > 8:
-            length = 8 - index
-        if length == 0:
-            raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashReadOnce [ Index=%d | len=%d   ]', index, length)
+        if byte_count not in (4, 8):
+            raise ValueError('Byte count must be 4 or 8 and is: {}'.format(byte_count))
+        logging.info('TX-CMD: FlashReadOnce [ index=%d | bytes=%d ]', index, byte_count)
         # Prepare FlashReadOnce command
-        cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, length)
+        cmd = pack('<4B2I', CommandTag.FLASH_READ_ONCE, 0x00, 0x00, 0x02, index, byte_count)
         # Process FlashReadOnce command
-        self._process_cmd(cmd)
+        rx_packet = self._process_cmd(cmd)
         # Process Read Data
-        return self._read_data(length)
+        byte_count = unpack_from('<I', rx_packet, 8)[0]
+        value_format = '<Q' if byte_count == 8 else '<I'
+        value = unpack_from(value_format, rx_packet, 12)[0]
+        logging.info('RX-CMD: FlashReadOnce [ index=%d | bytes=%d ] = 0x%X', index, byte_count, value)
+        return value
 
-    def flash_program_once(self, index, data):
+    def flash_program_once(self, index, value, length=4):
         """ MBoot: Write into MCU flash program once region (max 8 bytes)
         :param index: Start index
-        :param data: List of bytes
+        :param value: Int value
+        :param length: 4 or 8 bytes
         """
-        length = len(data)
-        if (index + length) > 8:
-            length = 8 - index
-        if length == 0:
-            raise ValueError('Index out of range')
-        logging.info('TX-CMD: FlashProgramOnce [ Index=%d | Data[0x]: %s  ]', index, atos(data[:length]))
+        if length not in (4, 8):
+            raise ValueError('Length must be 4 or 8 and is: {}'.format(length))
+        logging.info('TX-CMD: FlashProgramOnce [ index=%d | length=%d | value=0x%X ]', index, length, value)
         # Prepare FlashProgramOnce command
-        cmd = pack('<4B2I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length)
-        cmd += bytes(data)
+        if length == 4:
+            cmd = pack('<4B3I', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length, value)
+        else:
+            cmd = pack('<4B2IQ', CommandTag.FLASH_PROGRAM_ONCE, 0x00, 0x00, 0x03, index, length, value)
         # Process FlashProgramOnce command
         self._process_cmd(cmd)
         return length
 
-    def flash_read_resource(self, start_address, length, option=1):
+    def flash_read_resource(self, address, length, option=1):
         """ MBoot: Read resource of flash module
-        :param start_address:
-        :param length:
+        :param address: Start address
+        :param length: Number of bytes
         :param option:
         :return resource list
         """
-        logging.info('TX-CMD: FlashReadResource [ StartAddr=0x%08X | len=%d ]', start_address, length)
+        logging.info('TX-CMD: FlashReadResource [ address=0x%08X | length=%d ]', address, length)
         # Prepare FlashReadResource command
-        cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, start_address, length, option)
+        cmd = pack('<4B3I', CommandTag.FLASH_READ_RESOURCE, 0x00, 0x00, 0x03, address, length, option)
         # Process FlashReadResource command
         pkg = self._process_cmd(cmd)
         rx_len = self._parse_value(pkg)
@@ -688,23 +947,52 @@ class McuBoot(object):
         # Process Read Data
         return self._read_data(length)
 
-    def configure_memory(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"configure_memory()\" not implemented yet')
+    def configure_memory(self, mem_id, config_block_address):
+        """ MBoot: Configure memory
+        :param mem_id:
+        :param config_block_address:
+        """
+        logging.info('TX-CMD: ConfigureMemory [ %s | ConfBlockAddress=0x%08X ]', ExtMemId[mem_id], config_block_address)
+        # Prepare ConfigureMemory command
+        cmd = pack('<4B2I', CommandTag.CONFIGURE_MEMORY, 0x00, 0x00, 0x02, mem_id, config_block_address)
+        # Process ConfigureMemory command
+        self._process_cmd(cmd)
 
-    def reliable_update(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"reliable_update()\" not implemented yet')
+    def reliable_update(self, address):
+        """ MBoot: Reliable Update
+        :param address:
+        """
+        logging.info('TX-CMD: ReliableUpdate [ address=0x%08X ]', address)
+        # Prepare ReliableUpdate command
+        cmd = pack('<4BI', CommandTag.RELIABLE_UPDATE, 0x00, 0x00, 0x01, address)
+        # Process ReliableUpdate command
+        self._process_cmd(cmd)
 
-    def generate_key_blob(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"generate_key_blob()\" not implemented yet')
+    def generate_key_blob(self, address, length, phase):
+        """ MBoot: Generate Key Blob
+        :param address:
+        :param length:
+        :param phase:
+        :return:
+        """
+        logging.info('TX-CMD: GenerateKeyBlob [ address=0x%08X, length=%d, phase=%d ]', address, length, phase)
+        # Prepare GenerateKeyBlob command
+        cmd = pack('<4B3I', CommandTag.GENERATE_KEY_BLOB, 0x00, 0x00, 0x03, address, length, phase)
+        # Process GenerateKeyBlob command
+        self._process_cmd(cmd)
 
-    def key_provisioning(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"key_provisioning()\" not implemented yet')
-
-    def load_image(self):
-        # TODO: Write implementation
-        raise NotImplementedError('Function \"load_image()\" not implemented yet')
-
+    def key_provisioning(self, operation, key_type, index, size, address):
+        """ MBoot: Key Provisioning
+        :param operation:
+        :param key_type:
+        :param index:
+        :param size:
+        :param address:
+        :return:
+        """
+        logging.info('TX-CMD: KeyProvisioning [ operation=%d, type=%d, index=%d, size=%d, address=0x%08X ]',
+                     operation, key_type, index, size, address)
+        # Prepare KeyProvisioning command
+        cmd = pack('<4B5I', CommandTag.KEY_PROVISIONING, 0x00, 0x00, 0x05, operation, key_type, index, size, address)
+        # Process KeyProvisioning command
+        self._process_cmd(cmd)
