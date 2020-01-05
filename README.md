@@ -97,7 +97,7 @@ if devices:
 
 By default is command error propagated by return value which must be processed individually for every command. In many 
 use-cases is code execution interrupted if any command finish with error. Therefore you have the option to enable the 
-exception also for command error. The usage is then much cleaner.
+exception also for command error.
 
 ```python
 from mboot import scan_usb, McuBoot, McuBootError
@@ -115,11 +115,12 @@ if devices:
         print(str(e))
 ```
 
-MBoot module implements a logging functionality for intuitive debugging of communication interfaces. All what you need 
-to do is just import `logging` module and set the logging level to `DEBUG` or `INFO` with single line of code 
+MBoot module implement a logging functionality for intuitive debugging of communication interfaces. All what you need 
+to do is just add line `import logging` into your code and set logging level to `DEBUG` or `INFO` with single line of code 
 `logging.basicConfig(level=logging.DEBUG)`
 
 ```python
+import mboot
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
