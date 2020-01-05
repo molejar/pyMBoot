@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-# Copyright (c) 2019 Martin Olejar
+# Copyright (c) 2017 Martin Olejar
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
@@ -9,9 +7,10 @@
 import os
 import sys
 import click
-import mboot
 import bincopy
 import traceback
+
+from mboot import McuBoot, scan_usb, ExtMemId, CommandTag, PropertyTag, parse_property_value
 
 
 ########################################################################################################################
@@ -19,11 +18,11 @@ import traceback
 ########################################################################################################################
 def hexdump(data, start_address=0, compress=True, length=16, sep='.'):
     """ Return string array in hex-dump format
-    :param data:          {List} The data array of {Bytes}
-    :param start_address: {Int}  Absolute Start Address
-    :param compress:      {Bool} Compressed output (remove duplicated content, rows)
-    :param length:        {Int}  Number of Bytes for row (max 16).
-    :param sep:           {Char} For the text part, {sep} will be used for non ASCII char.
+    :param data:          The data array of bytes
+    :param start_address: Absolute Start Address
+    :param compress:      Compressed output (remove duplicated content, rows)
+    :param length:        Number of Bytes for row (max 16)
+    :param sep:           Is used for non ASCII char
     """
     msg = []
 
@@ -107,24 +106,45 @@ def size_fmt(num, kibibyte=True):
 
 
 class UInt(click.ParamType):
-    """ Custom argument type for UINT """
-    name = 'unsigned int'
+    """ Custom argument type for unsigned integer """
+
+    name = 'uint'
+
+    def __init__(self, min=None, max=None, clamp=False):
+        self.min = min
+        self.max = max
+        self.clamp = clamp
 
     def __repr__(self):
         return 'UINT'
 
     def convert(self, value, param, ctx):
         try:
-            if isinstance(value, int):
-                return value
-            else:
-                return int(value, 0)
+            if not isinstance(value, int):
+                value = int(value, 0)
         except:
-            self.fail('{} is not a valid value'.format(value), param, ctx)
+            self.fail('{} is not a valid value format.'.format(value), param, ctx)
+
+        if self.clamp:
+            if self.min is not None and value < self.min:
+                return self.min
+            if self.max is not None and value > self.max:
+                return self.max
+
+        if self.min is not None and value < self.min or self.max is not None and value > self.max:
+            if self.min is None:
+                self.fail('{} is bigger than the maximum valid value {}.'.format(value, self.max), param, ctx)
+            elif self.max is None:
+                self.fail('{} is smaller than the minimum valid value {}.'.format(value, self.min), param, ctx)
+            else:
+                self.fail('{} is not in the valid range of {} to {}.'.format(value, self.min, self.max), param, ctx)
+
+        return value
 
 
 class BDKey(click.ParamType):
     """ Custom argument type for BackDoor Key """
+
     name = 'backdoor key'
 
     def __repr__(self):
@@ -134,46 +154,41 @@ class BDKey(click.ParamType):
         if value[0] == 'S':
             if len(value) < 18:
                 self.fail('Short key, use 16 ASCII chars !', param, ctx)
-            bdoor_key = [ord(k) for k in value[2:]]
+            backdoor_key = [ord(k) for k in value[2:]]
         else:
             if len(value) < 34:
                 self.fail('Short key, use 32 HEX chars !', param, ctx)
             value = value[2:]
-            bdoor_key = []
+            backdoor_key = []
             try:
                 for i in range(0, len(value), 2):
-                    bdoor_key.append(int(value[i:i+2], 16))
+                    backdoor_key.append(int(value[i:i+2], 16))
             except ValueError:
                 self.fail('Unsupported HEX char in Key !', param, ctx)
 
-        return bdoor_key
+        return backdoor_key
 
 
-class ImagePath(click.ParamType):
+class ImgFile(click.ParamType):
     """ Custom argument type for Image File """
-    name = 'image path'
 
-    def __init__(self, mode):
-        self.mode = mode
+    name = 'file'
+
+    def __init__(self, *extensions, exists=False):
+        self.exists = exists
+        self.valid_extensions = extensions
 
     def __repr__(self):
-        return 'IPATH'
+        return 'FILE'
 
     def convert(self, value, param, ctx):
-        if not value.lower().endswith(('.bin', '.hex', '.ihex',  '.s19', '.srec', '.sb')):
+        if not value.lower().endswith(self.valid_extensions):
             self.fail('Unsupported file type: *.{} !'.format(value.split('.')[-1]), param, ctx)
 
-        if self.mode == 'open' and not os.path.lexists(value):
-            self.fail('File [{}] does not exist !'.format(value), param, ctx)
+        if self.exists and not os.path.lexists(value):
+            self.fail('File "{}" does not exist !'.format(value), param, ctx)
 
         return value
-
-
-# Create instances of custom argument types
-UINT    = UInt()
-BDKEY   = BDKey()
-INFILE  = ImagePath('open')
-OUTFILE = ImagePath('save')
 
 
 ########################################################################################################################
@@ -184,7 +199,7 @@ OUTFILE = ImagePath('save')
 ERROR_CODE = 1
 
 # Application version
-VERSION = mboot.__version__
+VERSION = '0.2'
 
 # Application description
 DESCRIP = (
@@ -192,11 +207,13 @@ DESCRIP = (
     "NOTE: Development version, be carefully with it usage !\n"
 )
 
+MEMS = ['INTERNAL'] + [name for name, _, _ in ExtMemId]
+
 
 # helper method
-def scan_usb(device_name):
+def scan_interface(device_name):
     # Scan for connected devices
-    devs = mboot.scan_usb(device_name)
+    devs = scan_usb(device_name)
 
     if devs:
         index = 0
@@ -214,8 +231,13 @@ def scan_usb(device_name):
         return devs[index]
 
     else:
-        click.echo("\n - Target not detected !")
+        click.echo(" Device not connected !\n")
         sys.exit(ERROR_CODE)
+
+
+def print_error(message, debug=False):
+    click.echo('\n' + traceback.format_exc() if debug else ' ERROR: ' + message)
+    sys.exit(ERROR_CODE)
 
 
 # McuBoot: base options
@@ -241,89 +263,59 @@ def cli(ctx, target, debug):
 @cli.command(short_help="Get MCU info (mboot properties)")
 @click.pass_context
 def info(ctx):
-    # Read MBoot MCU Info (Properties collection)
 
-    nfo = []
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    properties = []
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect KBoot USB device
-        mb.open_usb(hid_dev)
-        # Get MCU info
-        nfo = mb.get_mcu_info()
+        with McuBoot(device, True) as mb:
+            properties = mb.get_property_list()
+
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect KBoot device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
-    # Print KBoot MCU Info
-    for key, value in nfo.items():
-        m = " {}:".format(key)
-        if isinstance(value, list):
-            m += "".join(["\n  - {}".format(s) for s in value])
+    for p in properties:
+        v = p.to_str()
+        if isinstance(v, list):
+            click.echo(f" {p.name}:" + "".join([f"\n  - {s}" for s in v]))
         else:
-            m += "\n  = {}".format(value)
-        click.echo(m)
+            click.echo(f" {p.name}: {v}")
 
 
 # McuBoot: print memories list command
 @cli.command(short_help="Get list of available memories")
 @click.pass_context
-def memlist(ctx):
+def mlist(ctx):
 
     mem_list = {}
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect KBoot USB device
-        mb.open_usb(hid_dev)
-        # Get MCU memory list
-        mem_list = mb.get_memory_list()
+        with McuBoot(device, True) as mb:
+            mem_list = mb.get_memory_list()
+
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect KBoot device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
     message = ''
     for key, values in mem_list.items():
-        message += "{}:\n".format(key)
+        message += " {}:\n".format(key.title().replace('_', ' '))
         if key in ('internal_ram', 'internal_flash'):
-            for i, item in enumerate(values):
-                message += " {}) Start Address: 0x{:08X}, Size: {}".format(i, item['address'], size_fmt(item['size']))
+            for i, item in values.items():
+                message += "  {}) 0x{:08X} - 0x{:08X}, Size: {}".format(
+                    i, item['address'], item['address'] + item['size'], size_fmt(item['size']))
                 if 'sector_size' in item:
                     message += ", Sector Size: {}".format(size_fmt(item['sector_size']))
                 message += '\n'
         else:
             for i, attr in enumerate(values):
-                message += " {}) {}:\n".format(i, attr['mem_name'])
+                message += "  {}) {}:\n".format(i, attr['mem_name'])
                 if 'address' in attr:
                     message += "     Start Address: 0x{:08X}\n".format(attr['address'])
                 if 'size' in attr:
@@ -341,51 +333,48 @@ def memlist(ctx):
 
 # McuBoot: configure external memory command
 @cli.command(short_help="Configure external memory")
-@click.option('-a', '--address', type=UINT, default=None, help='Start address for storing memory config. inside RAM')
-@click.argument('file', nargs=1, type=INFILE)
+@click.option('-a', '--address', type=UInt(), default=None, help='Location inside RAM for storing config data')
+@click.option('-w', '--word', type=UInt(), multiple=True, default=None, help='Configuration word')
+@click.option('-t', '--mtype', type=click.Choice(MEMS[1:]), default='QSPI', show_default=True, help='Memory Type')
+@click.option('-f', '--file', type=ImgFile('.conf', exists=True), help='Memory configuration file')
 @click.pass_context
-def memconf(ctx, address, file):
+def mconf(ctx, address, word, mtype, file):
 
-    err_msg = ""
-    memory_id = 0
-    memory_data = bytearray()
+    memory_id = ExtMemId[mtype]
+    memory_data = bytes()
 
-    # load memory configuration fom file
-    with open(file, 'r') as f:
-        # TODO: add file parser
-        pass
+    if word:
+        for w in word:
+            memory_data += w.to_bytes(4, 'little')
 
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
+    if file is not None:
+        print_error("Not implemented yet load memory configuration fom file")
+        # load memory configuration fom file
+        with open(file, 'r') as f:
+            # TODO: add file parser into memory_data
+            pass
 
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    if not memory_data:
+        print_error('The argument -w/--word or -f/--file must be specified !')
+
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect KBoot USB device
-        mb.open_usb(hid_dev)
+        with McuBoot(device, True) as mb:
+            if address is None:
+                # get internal memory start address and size
+                memory_address = mb.get_property(PropertyTag.RAM_START_ADDRESS)[0]
+                memory_size = mb.get_property(PropertyTag.RAM_SIZE)[0]
+                # calculate address
+                address = memory_address + memory_size - len(memory_data)
+                # add additional offset 1024 Bytes
+                address -= 1024
 
-        if address is None:
-            # get internal memory start address and size
-            memory_address = mb.get_property(mboot.PropertyTag.RAM_START_ADDRESS)[0]
-            memory_size = mb.get_property(mboot.PropertyTag.RAM_SIZE)[0]
-            # calculate address
-            address = memory_address + memory_size - len(memory_data)
-            # add additional offset 1024 Bytes
-            address -= 1024
-
-        mb.write_memory(address, memory_data)
-        mb.configure_memory(memory_id, address)
+            mb.write_memory(address, memory_data)
+            mb.configure_memory(memory_id, address)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect KBoot device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
@@ -393,52 +382,38 @@ def memconf(ctx, address, file):
 
 # McuBoot: receive SB file command
 @cli.command(short_help="Receive SB file")
-@click.argument('file', nargs=1, type=INFILE)
+@click.argument('file', nargs=1, type=ImgFile(('.bin', '.sb', '.sb2'), True))
 @click.pass_context
 def sbfile(ctx, file):
 
-    err_msg = ""
+    device = scan_interface(ctx.obj['TARGET'])
 
-    # Load SB file
     with open(file, 'rb') as f:
         sb_data = f.read()
 
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
-
     try:
-        # Connect KBoot USB device
-        mb.open_usb(hid_dev)
-        # Write SB file data
-        mb.receive_sb_file(sb_data)
+        with McuBoot(device, True) as mb:
+            mb.receive_sb_file(sb_data)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect KBoot device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
 
 # McuBoot: memory write command
-@cli.command(short_help="Write data into MCU memory")
-@click.option('-a', '--address', type=UINT, default=None, help='Start Address.')
-@click.option('-o', '--offset', type=UINT, default=0, show_default=True, help='Offset of input data.')
-@click.option('-i', '--memid', type=UINT, default=0, show_default=True, help='Memory ID')
-@click.argument('file', nargs=1, type=INFILE)
+@cli.command(short_help="Write data into MCU internal or external memory")
+@click.option('-a', '--address', type=UInt(), default=None, help='Start Address.')
+@click.option('-o', '--offset', type=UInt(), default=0, show_default=True, help='Offset of input data.')
+@click.option('-t', '--mtype', type=click.Choice(MEMS), default='INTERNAL', show_default=True, help='Memory Type')
+@click.option('-e', '--erase', is_flag=True, default=False, help='Erase')
+@click.option('-v', '--verify', is_flag=True, default=False, help='Verify')
+@click.argument('file', nargs=1, type=ImgFile('.bin', '.hex', '.ihex',  '.s19', '.srec', exists=True))
 @click.pass_context
-def write(ctx, address, offset, file):
+def write(ctx, address, offset, mtype, erase, verify, file):
 
-    err_msg = ""
+    mem_id = 0 if mtype == 'INTERNAL' else ExtMemId[mtype]
     in_data = bincopy.BinFile()
 
     try:
@@ -457,45 +432,31 @@ def write(ctx, address, offset, file):
 
         data = in_data.as_binary()
     except Exception as e:
-        raise Exception('Could not read from file: {} \n [{}]'.format(file, str(e)))
+        print_error(f"Could not read from file: {file} \n [{str(e)}]")
+        raise
 
     if offset < len(data):
         data = data[offset:]
 
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
+    device = scan_interface(ctx.obj['TARGET'])
     click.echo(' Writing into MCU memory, please wait !\n')
 
-    # Create MBoot instance
-    mb = mboot.McuBoot()
-
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        # Read Flash Sector Size of connected MCU
-        flash_sector_size = mb.get_property(mboot.PropertyTag.FLASH_SECTOR_SIZE)[0]
+        with McuBoot(device, True) as mb:
+            # Read Flash Sector Size of connected MCU
+            flash_sector_size = mb.get_property(PropertyTag.FLASH_SECTOR_SIZE, mem_id)[0]
+            # Align Erase Start Address and Len to Flash Sector Size
+            start_address = (address & ~(flash_sector_size - 1))
+            length = (len(data) & ~(flash_sector_size - 1))
+            if (len(data) % flash_sector_size) > 0:
+                length += flash_sector_size
+            # Erase specified region in MCU Flash memory
+            mb.flash_erase_region(start_address, length, mem_id)
+            # Write data into MCU Flash memory
+            mb.write_memory(address, data, mem_id)
 
-        # Align Erase Start Address and Len to Flash Sector Size
-        start_address = (address & ~(flash_sector_size - 1))
-        length = (len(data) & ~(flash_sector_size - 1))
-        if (len(data) % flash_sector_size) > 0:
-            length += flash_sector_size
-
-        # Erase specified region in MCU Flash memory
-        mb.flash_erase_region(start_address, length)
-
-        # Write data into MCU Flash memory
-        mb.write_memory(address, data)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' - ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
@@ -504,47 +465,32 @@ def write(ctx, address, offset, file):
 
 
 # McuBoot: memory read command
-@cli.command(short_help="Read data from MCU memory")
+@cli.command(short_help="Read data from MCU internal or external memory")
+@click.option('-t', '--mtype', type=click.Choice(MEMS), default='INTERNAL', show_default=True, help='Memory Type')
 @click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
-@click.option('-f', '--file', type=OUTFILE, help='Output file name with ext.: *.bin, *.hex, *.ihex, *.srec or *.s19')
-@click.argument('address', type=UINT)
-@click.argument('length',  type=UINT, required=False)
+@click.option('-f', '--file', type=ImgFile('.bin', '.hex', '.ihex',  '.s19', '.srec'),
+              help='Output file name with ext.: *.bin, *.hex, *.ihex, *.srec or *.s19')
+@click.argument('address', type=UInt())
+@click.argument('length',  type=UInt())
 @click.pass_context
-def read(ctx, address, length, compress, file):
+def read(ctx, address, length, mtype, compress, file):
 
-    data = None
-    err_msg = ""
+    mem_id = 0 if mtype == 'INTERNAL' else ExtMemId[mtype]
+    device = scan_interface(ctx.obj['TARGET'])
 
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    click.echo(" Reading from MCU memory, please wait ! \n")
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        if ctx.obj['DEBUG']: click.echo()
-        if length is None:
-            size = mb.get_property(mboot.PropertyTag.FLASH_SIZE)[0]
-            if address > (size - 1):
-                raise Exception("LENGTH argument is required for non FLASH access !")
-            length = size - address
-        click.echo(" Reading from MCU memory, please wait ! \n")
-        # Call MBoot flash erase all function
-        data = mb.read_memory(address, length)
+        with McuBoot(device, True) as mb:
+            data = mb.read_memory(address, length, mem_id)
+
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
+        print_error(str(e), ctx.obj['DEBUG'])
 
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+    if ctx.obj['DEBUG']:
+        click.echo()
 
     if file is None:
-        if ctx.obj['DEBUG']: click.echo()
         click.echo(hexdump(data, address, compress))
     else:
         try:
@@ -563,56 +509,41 @@ def read(ctx, address, length, compress, file):
                 with open(file, "wb") as f:
                     f.write(data)
         except Exception as e:
-            raise Exception('Could not write to file: {} \n [{}]'.format(file, str(e)))
+            print_error(f"Could not write to file: {file} \n [{str(e)}]")
 
-        click.echo("\n Successfully saved into: {}".format(file))
+        click.echo(f"\n Successfully saved into: {file}")
 
 
 # McuBoot: memory erase command
-@cli.command(short_help="Erase MCU memory")
-@click.option('-m/', '--mass/', is_flag=True, default=False, help='Erase complete MCU memory.')
-@click.option('-a', '--address', type=UINT, help='Start Address.')
-@click.option('-l', '--length',  type=UINT, help='Count of bytes aligned to flash block size.')
+@cli.command(short_help="Erase MCU internal or external memory")
+@click.option('-m/', '--mass/', is_flag=True, default=False, help='Erase complete memory')
+@click.option('-a', '--address', type=UInt(), help='Start Address.')
+@click.option('-l', '--length',  type=UInt(), help='Count of bytes aligned to flash block size')
+@click.option('-t', '--mtype', type=click.Choice(MEMS), default='INTERNAL', show_default=True, help='Memory Type')
 @click.pass_context
-def erase(ctx, address, length, mass):
+def erase(ctx, address, length, mass, mtype):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    mem_id = 0 if mtype == 'INTERNAL' else ExtMemId[mtype]
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        if mass:
-            # Connect MBoot USB device
-            mb.open_usb(hid_dev)
-            # Get available commands
-            commands = mb.get_property(mboot.PropertyTag.AVAILABLE_COMMANDS)[0]
-            # Call MBoot flash erase all function
-            if mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL_UNSECURE, commands):
-                mb.flash_erase_all_unsecure()
-            elif mboot.is_command_available(mboot.CommandTag.FLASH_ERASE_ALL, commands):
-                mb.flash_erase_all()
+        with McuBoot(device, True) as mb:
+            if mass:
+                values = mb.get_property(PropertyTag.AVAILABLE_COMMANDS)
+                commands = parse_property_value(PropertyTag.AVAILABLE_COMMANDS, values)
+                if CommandTag.FLASH_ERASE_ALL_UNSECURE in commands:
+                    mb.flash_erase_all_unsecure()
+                elif CommandTag.FLASH_ERASE_ALL in commands:
+                    mb.flash_erase_all(mem_id)
+                else:
+                    raise Exception('Not Supported Command')
             else:
-                raise Exception('Not Supported Command')
-        else:
-            if address is None or length is None:
-                raise Exception("Argument \"-a, --address\" and \"-l, --length\" must be defined !")
-            # Connect MBoot USB device
-            mb.open_usb(hid_dev)
-            # Call MBoot flash erase region function
-            mb.flash_erase_region(address, length)
+                if address is None or length is None:
+                    raise Exception("Argument \"-a, --address\" and \"-l, --length\" must be defined !")
+                mb.flash_erase_region(address, length, mem_id)
+
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
@@ -622,224 +553,208 @@ def erase(ctx, address, length, mass):
 
 # McuBoot: eFuse read/write command
 @cli.command(short_help="Read/Write eFuse from MCU")
-@click.option('-l', '--length', type=UINT, default=4, show_default=True, help='Bytes count')
-@click.argument('index', type=UINT)
-@click.argument('value',  type=UINT, required=False)
+@click.argument('index', type=UInt())
+@click.argument('value',  type=UInt(), required=False)
 @click.pass_context
-def efuse(ctx, length, index, value):
+def efuse(ctx, index, value):
 
     read_value = 0
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-
-        if value is not None:
-            mb.flash_program_once(index, value, length)
-
-        read_value = mb.flash_read_once(index, length)
+        with McuBoot(device, True) as mb:
+            if value is not None:
+                mb.efuse_program_once(index, value)
+            read_value = mb.efuse_read_once(index)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
-    click.echo(" eFuse[{}] = 0x{:X}".format(index, read_value))
+    click.echo(f" eFuse[{index}] = 0x{read_value:08X}")
+
+
+# McuBoot: OTP read/write command
+@cli.command(short_help="Read/Write internal OTP segment")
+@click.option('-l', '--length', type=UInt(), default=4, show_default=True, help='Bytes count')
+@click.argument('address', type=UInt())
+@click.argument('data',  type=UInt(), required=False)
+@click.pass_context
+def otp(ctx, length, address, data):
+
+    read_data = 0
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            # TODO: write implementation
+            pass
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: read resource command
+@cli.command(short_help="Flash read resource")
+@click.option('-o', '--option', type=UInt(), default=0, show_default=True, help='Option')
+@click.option('-c', '--compress', is_flag=True, show_default=True, help='Compress dump output.')
+@click.option('-f', '--file', type=ImgFile('.bin', '.hex', '.ihex',  '.s19', '.srec'),
+              help='Output file name with ext.: *.bin, *.hex, *.ihex, *.srec or *.s19')
+@click.argument('address', type=UInt())
+@click.argument('length',  type=UInt())
+@click.pass_context
+def resource(ctx, address, length, option, compress, file):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            data = mb.flash_read_resource(address, length, option)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    if file is None:
+        click.echo(hexdump(data, address, compress))
+    else:
+        try:
+            if file.lower().endswith(('.srec', '.s19')):
+                srec = bincopy.BinFile()
+                srec.add_binary(data, address)
+                srec.header = 'mboot'
+                with open(file, "w") as f:
+                    f.write(srec.as_srec())
+            elif file.lower().endswith(('.hex', '.ihex')):
+                ihex = bincopy.BinFile()
+                ihex.add_binary(data, address)
+                with open(file, "w") as f:
+                    f.write(ihex.as_ihex())
+            else:
+                with open(file, "wb") as f:
+                    f.write(data)
+        except Exception as e:
+            print_error(f'Could not write to file: {file} \n [{str(e)}]')
+
+        click.echo(f" Successfully saved into: {file}")
 
 
 # McuBoot: unlock command
 @cli.command(short_help="Unlock MCU")
-@click.option('-k', '--key', type=BDKEY, help='Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08')
+@click.option('-k', '--key', type=BDKey(), help='Use backdoor key as ASCI = S:123...8 or HEX = X:010203...08')
 @click.pass_context
 def unlock(ctx, key):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
+        with McuBoot(device, True) as mb:
+            if key is None:
+                mb.flash_erase_all_unsecure()
+            else:
+                mb.flash_security_disable(key)
 
-        if key is None:
-            # Call MBoot flash erase all and unsecure function
-            mb.flash_erase_all_unsecure()
-        else:
-            # Call MBoot flash security disable function
-            mb.flash_security_disable(key)
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
-    click.echo(" Unlocked Successfully.")
+    click.echo(" Device unlocked successfully.")
 
 
 # McuBoot: fill memory command
 @cli.command(short_help="Fill MCU memory with specified pattern")
-@click.option('-p', '--pattern', type=UINT, default=0xFFFFFFFF, help='Pattern format (default: 0xFFFFFFFF).')
-@click.argument('address', type=UINT)
-@click.argument('length',  type=UINT)
+@click.option('-p', '--pattern', type=UInt(), default=0xFFFFFFFF, help='Pattern format (default: 0xFFFFFFFF).')
+@click.argument('address', type=UInt())
+@click.argument('length',  type=UInt())
 @click.pass_context
 def fill(ctx, address, length, pattern):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        # Call MBoot fill memory function
-        mb.fill_memory(address, length, pattern)
+        with McuBoot(device, True) as mb:
+            mb.fill_memory(address, length, pattern)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
-    click.secho(" Filled Successfully.")
+    click.secho(f" Memory filled successfully with pattern: 0x{pattern:X}")
 
 
 # McuBoot: reliable update command
 @cli.command(short_help="Copy backup app from address to main app region")
-@click.argument('address', type=UINT)
+@click.argument('address', type=UInt())
 @click.pass_context
 def update(ctx, address):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        mb.reliable_update(address)
+        with McuBoot(device, True) as mb:
+            mb.reliable_update(address)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
 
 # McuBoot: call command
-@cli.command(short_help="Call code at address with specified argument")
-@click.argument('address', type=UINT)
-@click.argument('argument', type=UINT)
+@cli.command(short_help="Call code from specified address")
+@click.argument('address', type=UInt())
+@click.argument('argument', type=UInt())
 @click.pass_context
 def call(ctx, address, argument):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        mb.call(address, argument)
+        with McuBoot(device, True) as mb:
+            mb.call(address, argument)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
+
+    click.secho(" Code executed")
 
 
 # McuBoot: execute command
-@cli.command(short_help="Execute code at address with specified argument and stackpointer")
-@click.argument('address', type=UINT)
-@click.argument('argument', type=UINT)
-@click.argument('stackpointer', type=UINT)
+@cli.command(short_help="Execute code from specified address")
+@click.argument('address', type=UInt())
+@click.argument('argument', type=UInt())
+@click.argument('stackpointer', type=UInt())
 @click.pass_context
 def execute(ctx, address, argument, stackpointer):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create MBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
-        mb.execute(address, argument, stackpointer)
+        with McuBoot(device, True) as mb:
+            mb.execute(address, argument, stackpointer)
 
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
+
+    click.secho(" Code executed")
 
 
 # McuBoot: reset command
@@ -847,34 +762,196 @@ def execute(ctx, address, argument, stackpointer):
 @click.pass_context
 def reset(ctx):
 
-    err_msg = ""
-
-    # Scan USB
-    hid_dev = scan_usb(ctx.obj['TARGET'])
-
-    # Create KBoot instance
-    mb = mboot.McuBoot()
+    device = scan_interface(ctx.obj['TARGET'])
 
     try:
-        # Connect MBoot USB device
-        mb.open_usb(hid_dev)
+        with McuBoot(device, True) as mb:
+            mb.reset(reopen=False)
 
-        # Call MBoot MCU reset function
-        mb.reset()
     except Exception as e:
-        err_msg = '\n' + traceback.format_exc() if ctx.obj['DEBUG'] else ' ERROR: {}'.format(str(e))
-
-    # Disconnect MBoot Device
-    mb.close()
-
-    if err_msg:
-        click.echo(err_msg)
-        sys.exit(ERROR_CODE)
+        print_error(str(e), ctx.obj['DEBUG'])
 
     if ctx.obj['DEBUG']:
         click.echo()
 
-    click.secho(" Reset OK")
+    click.secho(" Reset success")
+
+
+# McuBoot: Generate key blob command
+@cli.command(short_help="Generate the Blob for given DEK Key")
+@click.option('-c', '--count', type=UInt(), default=72, show_default=True, help='Key blob count')
+@click.argument('dekfile', nargs=1, type=ImgFile('.dek', exists=True))
+@click.argument('blobfile', nargs=1, type=ImgFile('.bin'))
+@click.pass_context
+def keyblob(ctx, count, dekfile, blobfile):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    with open(dekfile, "rb") as f:
+        dek_data = f.read()
+
+    try:
+        with McuBoot(device, True) as mb:
+            blob_data = mb.generate_key_blob(dek_data, count)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    with open(blobfile, "wb") as f:
+        f.write(blob_data)
+
+    click.echo(f" Successfully saved into: {blobfile}")
+
+# McuBoot: Key provisioning command -> Enroll
+@cli.command(short_help="Key provisioning: Enroll")
+@click.pass_context
+def kp_enroll(ctx):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_enroll()
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Generate Intrinsic Key
+@cli.command(short_help="Key provisioning: Generate Intrinsic Key")
+@click.argument('key_type', type=UInt())
+@click.argument('key_size', type=UInt())
+@click.pass_context
+def kp_gen_key(ctx, key_type, key_size):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_set_intrinsic_key(key_type, key_size)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Send the user key to a bootloader
+@cli.command(short_help="Key provisioning: Send the user key to a bootloader")
+@click.argument('key_type', type=UInt())
+@click.argument('file', nargs=1, type=ImgFile('.bin', exists=True))
+@click.pass_context
+def kp_user_key(ctx, key_type, file):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    with open(file, "rb") as f:
+        key_data = f.read()
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_set_user_key(key_type, key_data)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Write the key into nonvolatile memory
+@cli.command(short_help="Key provisioning: Write the key into nonvolatile memory")
+@click.argument('memid', type=UInt())
+@click.pass_context
+def kp_write_nvm(ctx, memid):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_write_nonvolatile(memid)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Read the key from nonvolatile memory
+@cli.command(short_help="Key provisioning: Read the key from nonvolatile memory")
+@click.argument('memid', type=UInt())
+@click.pass_context
+def kp_read_nvm(ctx, memid):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_read_nonvolatile(memid)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Write the key into key store area
+@cli.command(short_help="Key provisioning: Write the key into key store area")
+@click.argument('key_type', type=UInt())
+@click.argument('file', nargs=1, type=ImgFile('.bin', exists=True))
+@click.pass_context
+def kp_write_kstore(ctx, key_type, file):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    with open(file, "rb") as f:
+        key_data = f.read()
+
+    try:
+        with McuBoot(device, True) as mb:
+            mb.kp_write_key_store(key_type, key_data)
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+
+# McuBoot: Key provisioning command -> Read the key from key store area
+@cli.command(short_help="Key provisioning: Read the key from key store area")
+@click.option('-f', '--file', type=ImgFile('.bin'), help='Output file name with ext.: *.bin')
+@click.pass_context
+def kp_read_kstore(ctx, file):
+
+    device = scan_interface(ctx.obj['TARGET'])
+
+    try:
+        with McuBoot(device, True) as mb:
+            key_data = mb.kp_read_key_store()
+
+    except Exception as e:
+        print_error(str(e), ctx.obj['DEBUG'])
+
+    if ctx.obj['DEBUG']:
+        click.echo()
+
+    if file is None:
+        click.echo(hexdump(key_data))
+    else:
+        with open(file, "wb") as f:
+            f.write(key_data)
+
+        click.echo(f" Successfully saved into: {file}")
 
 
 def main():

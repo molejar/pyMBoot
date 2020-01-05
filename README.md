@@ -52,51 +52,97 @@ In case of development, install it from cloned sources:
 Usage
 -----
 
-The following example is showing how to use `mboot` module in your code.
+* Import `mboot` module
+* Use `mboot.scan_usb()` function for getting list of connected devices  
+* Select single device from all connected and create `McuBoot` instance over this device
+* Start with open connection and finish with close connection
 
-``` python
+```python
+import mboot
 
-    import mboot
+devices = mboot.scan_usb()
 
-    # Create mboot instance
-    mb = mboot.McuBoot()
+if devices:
+    mb = mboot.McuBoot(devices[0])
+    mb.open()
+    # read 1000 bytes from address 0
+    data = mb.read_memory(0, 1000)
+    if data is None:
+        print(mb.status_info)
+        mb.close()
+        exit()
 
+    # other code ...
+
+    mb.close()
+```
+
+`McuBoot` class is supporting `with` statement what can make the code cleaner and much more readable.
+
+```python
+from mboot import scan_usb, McuBoot
+
+devices = scan_usb()
+
+if devices:
+    with McuBoot(devices[0]) as mb:
+        # read 1000 bytes from address 0
+        data = mb.read_memory(0, 1000)
+        if data is None:
+            print(mb.status_info)
+            exit()
+
+        # other code ...
+```
+
+By default is command error propagated by return value which must be processed individually for every command. In many 
+use-cases is code execution interrupted if any command finish with error. Therefore you have the option to enable the 
+exception also for command error. The usage is then much cleaner.
+
+```python
+from mboot import scan_usb, McuBoot, McuBootError
+
+devices = scan_usb()
+
+if devices:
     try:
-        # Scan for connected MCU's
-        devs = mboot.scan_usb()
+        with McuBoot(devices[0], True) as mb:
+            # read 1000 bytes from address 0
+            data = mb.read_memory(0, 1000)
+            # other code ...
 
-        if devs:
-            index = 0
-            
-            if len(devs) > 1:
-                # Print list of connected devices
-                for i, dev in enumerate(devs):
-                    print("{}) {}".format(i, dev.info()))
-                # Select one from all connected devices
-                print('Select: ', end='', flush=True)
-                c = input()
-                print()
-                index = int(c, 10)
-                
-            # Connect to USB device
-            mb.open_usb(devs[index])
-
-            # Read MCU memory: 100 bytes from address 0
-            data = mb.read_memory(start_address=0, length=100)
-
-            # Other commands
-            # ...
-
-            # Close USB port if finish
-            mb.close()
-            
-        else:
-            print("Connect device to PC !")
-
-    # Handle exception
-    except Exception as e:
+    except McuBootError as e:
         print(str(e))
+```
 
+MBoot module implements a logging functionality for intuitive debugging of communication interfaces. All what you need 
+to do is just import `logging` module and set the logging level to `DEBUG` or `INFO` with single line of code 
+`logging.basicConfig(level=logging.DEBUG)`
+
+```python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+```
+
+**Terminal output example with logging:**
+
+```text
+INFO:MBOOT:Connect: USB COMPOSITE DEVICE (0x15A2, 0x0073)
+DEBUG:MBOOT:USB:Open Interface
+INFO:MBOOT:CMD: ReadMemory(address=0x00000000, length=100, mem_id=0)
+DEBUG:MBOOT:TX-PACKET: Tag=ReadMemory, Flags=0x00, p0=0x00000000, p1=0x00000064, p2=0x00000000
+DEBUG:MBOOT:USB:OUT[64]: 01 00 20 00 03 00 00 03 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A3 01 00 02 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ...
+INFO:MBOOT:RX-PACKET: Tag=ReadMemoryResponse, Status=Success, Length=100
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 60 00 20 C1 00 00 00 0D 85 00 00 09 01 00 00 00 00 00 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 00 00 00 00 00 00 00 00 00 00 09 01 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 04 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
+DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A0 00 00 02 00 00 00 00 03 00 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
+DEBUG:MBOOT:RX-PACKET: Tag=GenericResponse, Status=Success, Cmd=ReadMemory
+INFO:MBOOT:CMD: Successfully Received 100 from 100 Bytes
+DEBUG:MBOOT:USB:Close Interface
 ```
 
 [ mboot ] Tool
@@ -122,20 +168,30 @@ individual commands just use `mboot <command name> -?`.
       -?, --help                 Show this message and exit.
     
     Commands:
-      call     Call code at address with specified argument
-      efuse    Read/Write eFuse from MCU
-      erase    Erase MCU memory
-      execute  Execute code at address with specified argument and stackpointer
-      fill     Fill MCU memory with specified pattern
-      info     Get MCU info (mboot properties)
-      memconf  Configure external memory
-      memlist  Get list of available memories
-      read     Read data from MCU memory
-      reset    Reset MCU
-      sbfile   Receive SB file
-      unlock   Unlock MCU
-      update   Copy backup app from address to main app region
-      write    Write data into MCU memory
+      call             Call code from specified address
+      efuse            Read/Write eFuse from MCU
+      erase            Erase MCU internal or external memory
+      execute          Execute code from specified address
+      fill             Fill MCU memory with specified pattern
+      info             Get MCU info (mboot properties)
+      keyblob          Generate the Blob for given DEK Key
+      kp-enroll        Key provisioning: Enroll
+      kp-gen-key       Key provisioning: Generate Intrinsic Key
+      kp-read-kstore   Key provisioning: Read the key from key store area
+      kp-read-nvm      Key provisioning: Read the key from nonvolatile memory
+      kp-user-key      Key provisioning: Send the user key to a bootloader
+      kp-write-kstore  Key provisioning: Write the key into key store area
+      kp-write-nvm     Key provisioning: Write the key into nonvolatile memory
+      mconf            Configure external memory
+      mlist            Get list of available memories
+      otp              Read/Write internal OTP segment
+      read             Read data from MCU internal or external memory
+      reset            Reset MCU
+      resource         Flash read resource
+      sbfile           Receive SB file
+      unlock           Unlock MCU
+      update           Copy backup app from address to main app region
+      write            Write data into MCU internal or external memory
 
 ```
 
@@ -147,26 +203,21 @@ individual commands just use `mboot <command name> -?`.
 
 Read bootloader properties from connected MCU.
 
-``` bash
+```bash
  $ mboot info
 
  DEVICE: Kinetis Bootloader (0x15A2, 0x0073)
 
- CurrentVersion:
-  = K1.0.0
+ CurrentVersion: K1.0.0
  AvailablePeripherals:
   - UART
   - I2C-Slave
   - SPI-Slave
   - USB-HID
- FlashStartAddress:
-  = 0x00000000
- FlashSize:
-  = 256.0 kiB
- FlashSectorSize:
-  = 1.0 kiB
- FlashBlockCount:
-  = 2
+ FlashStartAddress: 0x00000000
+ FlashSize: 256.0 kiB
+ FlashSectorSize: 1.0 kiB
+ FlashBlockCount: 2
  AvailableCommands:
   - FlashEraseAll
   - FlashEraseRegion
@@ -177,23 +228,35 @@ Read bootloader properties from connected MCU.
   - Call
   - Reset
   - SetProperty
- VerifyWrites:
-  = ON
- MaxPacketSize:
-  = 32 B
+ VerifyWrites: ON
+ MaxPacketSize: 32 B
  ReservedRegions:
-  - [0]: 0x00000000 - 0x00000000 (0 B)
-  - [1]: 0x1FFFF800 - 0x20000687 (3.6 kiB)
- ValidateRegions:
-  = 1
- RAMStartAddress:
-  = 0x1FFFE000
- RAMSize:
-  = 32.0 kiB
- SystemDeviceIdent:
-  = 0x23161D82
- FlashSecurityState:
-  = Unlocked
+  - 0x1FFFF800 - 0x20000687, 3.6 kiB
+ ValidateRegions: ON
+ RamStartAddress: 0x1FFFE000
+ RamSize: 32.0 kiB
+ SystemDeviceIdent: 0x23160D82
+ FlashSecurityState: Unlocked
+
+```
+
+<br>
+
+#### $ mboot mlist
+
+Get list of available memories inside MCU
+
+```bash
+ $ mboot info
+
+ DEVICE: Kinetis Bootloader (0x15A2, 0x0073)
+
+ Internal Flash:
+  0) 0x00000000 - 0x00040000, Size: 256.0 kiB, Sector Size: 1.0 kiB
+
+ Internal Ram:
+  0) 0x1FFFE000 - 0x20006000, Size: 32.0 kiB
+
 ```
 
 <br>

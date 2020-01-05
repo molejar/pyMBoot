@@ -1,34 +1,38 @@
-# Copyright (c) 2019 Martin Olejar
+# Copyright (c) 2017 Martin Olejar
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
-from .enums import CommandTag, PropertyTag, StatusCode
-from .mboot import McuBoot, scan_usb, decode_property_value, is_command_available, McuBootGenericError, \
-                   McuBootCommandError, McuBootDataError, McuBootConnectionError, McuBootTimeOutError
+from .mcuboot import McuBoot
+from .commands import CommandTag
+from .memories import ExtMemPropTags, ExtMemId
+from .properties import PropertyTag, PeripheryTag, Version, parse_property_value
+from .exceptions import McuBootError, McuBootCommandError, McuBootConnectionError
+from .errorcodes import StatusCode
+from .connection import scan_usb
+
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
 __version__ = '0.2.0'
 __license__ = "BSD3"
 __status__ = 'Development'
-
 __all__ = [
     # global methods
     'scan_usb',
-    'decode_property_value',
-    'is_command_available',
+    'parse_property_value',
     # classes
     'McuBoot',
+    'Version',
     # enums
-    'CommandTag',
     'PropertyTag',
+    'PeripheryTag',
+    'CommandTag',
     'StatusCode',
+    'ExtMemId',
     # exceptions
-    'McuBootGenericError',
+    'McuBootError',
     'McuBootCommandError',
-    'McuBootDataError',
-    'McuBootConnectionError',
-    'McuBootTimeOutError'
+    'McuBootConnectionError'
 ]

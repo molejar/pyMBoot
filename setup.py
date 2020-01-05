@@ -6,21 +6,16 @@
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
+
 from os import path
 from setuptools import setup
 from mboot import __version__, __license__, __author__, __contact__
 
 
-def long_description():
-    try:
-        import pypandoc
+def get_long_description():
+    with open(path.join(path.dirname(path.abspath(__file__)), 'README.md'), encoding='utf8') as fp:
+        return fp.read()
 
-        readme_path = path.join(path.dirname(__file__), 'README.md')
-        return pypandoc.convert(readme_path, 'rst').replace('\r', '')
-    except (IOError, ImportError):
-        return (
-            "More on: https://github.com/molejar/pyMBoot"
-        )
 
 setup(
     name='mboot',
@@ -30,10 +25,9 @@ setup(
     author_email=__contact__,
     url="https://github.com/molejar/pyMBoot",
     description='Python module for communication with NXP MCU Bootloader',
-    long_description=long_description(),
-    keywords="NXP MCU Bootloader",
-    platforms="Windows, Linux",
-    python_requires=">=3.5",
+    long_description=get_long_description(),
+    long_description_content_type='text/markdown',
+    python_requires='>=3.6',
     setup_requires=[
         'setuptools>=40.0'
     ],
@@ -41,12 +35,14 @@ setup(
         'click==7.0',
         'pyserial==3.4',
         'bincopy==16.0.0',
-        'easy_enum==0.2.0',
-        'pyusb==1.0.0;platform_system!="Windows"',
-        'pywinusb==0.4.2;platform_system=="Windows"'
+        'easy_enum==0.3.0',
+        'pyusb==1.0.2',
+        'pywinusb==0.4.2;platform_system=="Windows"',
     ],
     classifiers=[
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Operating System :: POSIX :: Linux',
         'Operating System :: Microsoft :: Windows',
         'Environment :: Console',
