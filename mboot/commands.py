@@ -213,10 +213,7 @@ class FlashReadOnceResponse(ReadMemoryResponse):
 
     @property
     def data(self):
-        data = b''
-        for i in range(self.header.params_count - 2):
-            data += pack('<L', self.params[i + 2])
-        return data
+        return pack(f'<{self.header.params_count - 2}L', *self.params[2:])
 
 
 class FlashReadResourceResponse(ReadMemoryResponse):
@@ -243,5 +240,5 @@ def parse_cmd_response(data: bytes, offset: int = 0) -> CmdResponse:
         ResponseTag.KEY_PROVISIONING_RESPONSE: KeyProvisioningResponse
     }
     response_tag = data[offset]
-    response_class = CmdResponse if response_tag not in known_responses else known_responses[response_tag]
+    response_class = known_responses.get(response_tag, CmdResponse)
     return response_class.from_bytes(data, offset)

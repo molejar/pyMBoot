@@ -78,9 +78,6 @@ if devices:
 `McuBoot` class is supporting `with` statement what is eliminating the explicit call of `open` and `close` methods. The 
 code then looks more cleaner as you can see in following example.
 
-> If you call `reset()` command inside `with` block, the device is automatically reopened. You can skip this with 
-explicit argument `reset(reopen=False)`
-
 ```python
 from mboot import scan_usb, McuBoot
 
@@ -96,6 +93,9 @@ if devices:
 
         # other commands ...
 ```
+
+> If you call `reset()` command inside `with` block, the device is automatically reopened. You can skip this with 
+explicit argument `reset(reopen=False)`
 
 By default is command error propagated by return value and must be processed individually for every command. In many 
 use-cases is code execution interrupted if any command finish with error. Therefore you have the option to enable the 
@@ -117,7 +117,7 @@ if devices:
         print(str(e))
 ```
 
-MBoot module is implementing also logging functionality for easy debugging of communication interfaces. All what you 
+`mboot` module is implementing also logging functionality for easy debugging of communication interfaces. All what you 
 need to do is just import `logging` module and set the logging level (`DEBUG` or `INFO`) with following line of code: 
 `logging.basicConfig(level=logging.DEBUG)`
 

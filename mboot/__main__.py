@@ -585,7 +585,8 @@ def efuse(ctx, index, value):
 @click.pass_context
 def otp(ctx, length, address, data):
 
-    read_data = 0
+    print_error("ERROR: 'otp' command is not implemented yet")
+
     device = scan_interface(ctx.obj['TARGET'])
 
     try:
