@@ -15,7 +15,7 @@ from .connection import scan_usb
 
 __author__ = "Martin Olejar"
 __contact__ = "martin.olejar@gmail.com"
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 __license__ = "BSD3"
 __status__ = 'Development'
 __all__ = [

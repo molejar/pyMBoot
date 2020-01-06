@@ -42,6 +42,7 @@ class KeyProvOperation(Enum):
 ########################################################################################################################
 # McuBoot Main Class
 ########################################################################################################################
+
 class McuBoot:
 
     @property
@@ -81,7 +82,7 @@ class McuBoot:
         cmd_name = CommandTag[cmd_packet.header.tag]
 
         if not isinstance(cmd_response, CmdResponse):
-            raise McuBootError(f"CMD: {cmd_name} error: Unsupported response format")
+            raise McuBootError(f"CMD: {cmd_name} Error: Unsupported response format")
 
         self._status_code = cmd_response.status_code
 

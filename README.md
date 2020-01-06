@@ -14,7 +14,7 @@ embedded [MCUBOOT](https://www.nxp.com/support/developer-resources/software-deve
 Dependencies
 ------------
 
-- [Python 3.x](https://www.python.org) - The interpreter
+- [Python >3.6](https://www.python.org) - The interpreter for Python programing language
 - [Click](http://click.pocoo.org) - Python package for creating beautiful command line interface.
 - [bincopy](https://github.com/eerimoq/bincopy) - Python package for parsing S-Record, Intel HEX and TI-TXT files.
 - [easy_enum](https://github.com/molejar/pyEnum) - User friendly implementation of documented Enum type for Python language.
@@ -25,22 +25,22 @@ Dependencies
 Installation
 ------------
 
-``` bash
-    $ pip install mboot
+```bash
+ $ pip install mboot
 ```
 
 To install the latest version from master branch execute in shell following command:
 
-``` bash
-    $ pip install -U https://github.com/molejar/pyMBoot/archive/master.zip
+```bash
+ $ pip install -U https://github.com/molejar/pyMBoot/archive/master.zip
 ```
 
 In case of development, install it from cloned sources:
 
-``` bash
-    $ git clone https://github.com/molejar/pyMBoot.git
-    $ cd pyMBoot
-    $ pip install -U -e .
+```bash
+ $ git clone https://github.com/molejar/pyMBoot.git
+ $ cd pyMBoot
+ $ pip install -U -e .
 ```
 
 **NOTE:** You may run into a permissions issues running these commands. Here are a few options how to fix it:
@@ -52,10 +52,8 @@ In case of development, install it from cloned sources:
 Usage
 -----
 
-* Import `mboot` module
-* Use `mboot.scan_usb()` function for getting list of connected devices  
-* Select single device from all connected and create `McuBoot` instance over this device
-* Start with open connection and finish with close connection
+The API of `mboot` module is intuitive and fully reflecting the functionality described in reference manual of any 
+supported device. It's basic usage is presented in following example.
 
 ```python
 import mboot
@@ -65,19 +63,23 @@ devices = mboot.scan_usb()
 if devices:
     mb = mboot.McuBoot(devices[0])
     mb.open()
-    # read 1000 bytes from address 0
-    data = mb.read_memory(0, 1000)
+    # read 100 bytes from address 0
+    data = mb.read_memory(0, 100)
     if data is None:
         print(mb.status_info)
         mb.close()
         exit()
 
-    # other code ...
+    # other commands ...
 
     mb.close()
 ```
 
-`McuBoot` class is supporting `with` statement what can make the code cleaner and much more readable.
+`McuBoot` class is supporting `with` statement what is eliminating the explicit call of `open` and `close` methods. The 
+code then looks more cleaner as you can see in following example.
+
+> If you call `reset()` command inside `with` block, the device is automatically reopened. You can skip this with 
+explicit argument `reset(reopen=False)`
 
 ```python
 from mboot import scan_usb, McuBoot
@@ -86,18 +88,18 @@ devices = scan_usb()
 
 if devices:
     with McuBoot(devices[0]) as mb:
-        # read 1000 bytes from address 0
-        data = mb.read_memory(0, 1000)
+        # read 100 bytes from address 0
+        data = mb.read_memory(0, 100)
         if data is None:
             print(mb.status_info)
             exit()
 
-        # other code ...
+        # other commands ...
 ```
 
-By default is command error propagated by return value which must be processed individually for every command. In many 
+By default is command error propagated by return value and must be processed individually for every command. In many 
 use-cases is code execution interrupted if any command finish with error. Therefore you have the option to enable the 
-exception also for command error.
+exception also for command error. The code is then much more readable as you can see in flowing example.
 
 ```python
 from mboot import scan_usb, McuBoot, McuBootError
@@ -107,40 +109,39 @@ devices = scan_usb()
 if devices:
     try:
         with McuBoot(devices[0], True) as mb:
-            # read 1000 bytes from address 0
-            data = mb.read_memory(0, 1000)
-            # other code ...
+            # read 100 bytes from address 0
+            data = mb.read_memory(0, 100)
+            # other commands ...
 
     except McuBootError as e:
         print(str(e))
 ```
 
-MBoot module implement a logging functionality for intuitive debugging of communication interfaces. All what you need 
-to do is just add line `import logging` into your code and set logging level to `DEBUG` or `INFO` with single line of code 
+MBoot module is implementing also logging functionality for easy debugging of communication interfaces. All what you 
+need to do is just import `logging` module and set the logging level (`DEBUG` or `INFO`) with following line of code: 
 `logging.basicConfig(level=logging.DEBUG)`
 
 ```python
-import mboot
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
 ```
 
-**Terminal output example with logging:**
+**The example of terminal output with enabled logging functionality:**
 
 ```text
 INFO:MBOOT:Connect: USB COMPOSITE DEVICE (0x15A2, 0x0073)
 DEBUG:MBOOT:USB:Open Interface
 INFO:MBOOT:CMD: ReadMemory(address=0x00000000, length=100, mem_id=0)
 DEBUG:MBOOT:TX-PACKET: Tag=ReadMemory, Flags=0x00, p0=0x00000000, p1=0x00000064, p2=0x00000000
-DEBUG:MBOOT:USB:OUT[64]: 01 00 20 00 03 00 00 03 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ...
-DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A3 01 00 02 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:OUT[64]: 01 00 20 00 03 00 00 03 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A3 01 00 02 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 ...
 INFO:MBOOT:RX-PACKET: Tag=ReadMemoryResponse, Status=Success, Length=100
-DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 60 00 20 C1 00 00 00 0D 85 00 00 09 01 00 00 00 00 00 00 00 00 00 00 00 00 ...
-DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 00 00 00 00 00 00 00 00 00 00 09 01 ...
-DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
-DEBUG:MBOOT:USB:IN [36]: 04 00 04 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
-DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A0 00 00 02 00 00 00 00 03 00 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 60 00 20 C1 00 00 00 0D 85 00 00 09 01 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 00 00 00 00 00 00 00 00 00 00 00 00 09 01 00 00 00 00 00 00 00 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 20 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 ...
+DEBUG:MBOOT:USB:IN [36]: 04 00 04 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 00 00 09 ...
+DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A0 00 00 02 00 00 00 00 03 00 00 00 09 01 00 00 09 01 00 00 09 ...
 DEBUG:MBOOT:RX-PACKET: Tag=GenericResponse, Status=Success, Cmd=ReadMemory
 INFO:MBOOT:CMD: Successfully Received 100 from 100 Bytes
 DEBUG:MBOOT:USB:Close Interface
@@ -149,16 +150,16 @@ DEBUG:MBOOT:USB:Close Interface
 [ mboot ] Tool
 --------------
 
-pyMBoot is distributed with command-line utility `mboot`, which presents the complete functionality of this library.
-If you write `mboot` into shell and click enter, then you get the description of its usage. For getting the help of
-individual commands just use `mboot <command name> -?`.
+pyMBoot is distributed with command-line utility `mboot`, which demonstrate the complete functionality of this library and
+can be used as replacement of `blhos` tool. If you write `mboot` into shell and click enter, then you get the description 
+of its usage. For getting the help of individual commands just use `mboot <command name> -?`.
 
 ``` bash
   $ mboot --help
   
     Usage: mboot [OPTIONS] COMMAND [ARGS]...
     
-      NXP MCU Bootloader Command Line Interface, version: 0.2.0
+      NXP MCU Bootloader Command Line Interface, version: 0.3.0
       
       NOTE: Development version, be carefully with it usage !
       
@@ -245,7 +246,7 @@ Read bootloader properties from connected MCU.
 
 #### $ mboot mlist
 
-Get list of available memories inside MCU
+Get list of available memories (internal and external)
 
 ```bash
  $ mboot info

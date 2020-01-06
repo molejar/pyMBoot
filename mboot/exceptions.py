@@ -16,7 +16,7 @@ class McuBootError(Exception):
     """
     MBoot Module: Base Exception
     """
-    fmt = 'MBoot: {description}'
+    fmt = 'MBoot ERROR: {description}'
 
     def __init__(self, desc=None):
         self.description = "Unknown Error" if desc is None else desc
@@ -29,7 +29,7 @@ class McuBootCommandError(McuBootError):
     """
     MBoot Module: Command Exception
     """
-    fmt = 'MBoot: {cmd_name} interrupted -> {description}'
+    fmt = 'MBoot ERROR: {cmd_name} interrupted -> {description}'
 
     def __init__(self, cmd, value):
         self.cmd_name = cmd
@@ -44,4 +44,4 @@ class McuBootConnectionError(McuBootError):
     """
     MBoot Module: Connection Exception
     """
-    fmt = 'MBoot: Connection issue -> {description}'
+    fmt = 'MBoot ERROR: Connection issue -> {description}'

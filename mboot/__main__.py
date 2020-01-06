@@ -192,14 +192,14 @@ class ImgFile(click.ParamType):
 
 
 ########################################################################################################################
-# KBoot tool
+# McuBoot CLI
 ########################################################################################################################
 
 # Application error code
 ERROR_CODE = 1
 
 # Application version
-VERSION = '0.2'
+VERSION = '0.3'
 
 # Application description
 DESCRIP = (
@@ -207,7 +207,14 @@ DESCRIP = (
     "NOTE: Development version, be carefully with it usage !\n"
 )
 
+# List of supported memories
 MEMS = ['INTERNAL'] + [name for name, _, _ in ExtMemId]
+
+
+# helper method
+def print_error(message, debug=False):
+    click.echo('\n' + traceback.format_exc() if debug else ' ' + message)
+    sys.exit(ERROR_CODE)
 
 
 # helper method
@@ -231,13 +238,7 @@ def scan_interface(device_name):
         return devs[index]
 
     else:
-        click.echo(" Device not connected !\n")
-        sys.exit(ERROR_CODE)
-
-
-def print_error(message, debug=False):
-    click.echo('\n' + traceback.format_exc() if debug else ' ERROR: ' + message)
-    sys.exit(ERROR_CODE)
+        print_error("Device not connected !\n")
 
 
 # McuBoot: base options
@@ -348,7 +349,7 @@ def mconf(ctx, address, word, mtype, file):
             memory_data += w.to_bytes(4, 'little')
 
     if file is not None:
-        print_error("Not implemented yet load memory configuration fom file")
+        print_error("Not implemented yet load memory configuration from file")
         # load memory configuration fom file
         with open(file, 'r') as f:
             # TODO: add file parser into memory_data
