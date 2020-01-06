@@ -82,7 +82,7 @@ class McuBoot:
         cmd_name = CommandTag[cmd_packet.header.tag]
 
         if not isinstance(cmd_response, CmdResponse):
-            raise McuBootError(f"CMD: {cmd_name} Error: Unsupported response format")
+            raise McuBootError(f"CMD: {cmd_name} -> Unsupported response format")
 
         self._status_code = cmd_response.status_code
 
@@ -158,7 +158,7 @@ class McuBoot:
         if len(data) < length or self.status_code != StatusCode.SUCCESS:
             logger.debug(f"CMD: Received {len(data)} from {length} Bytes, {self.status_info}")
             if self._cmd_exception:
-                raise McuBootCommandError(CommandTag[cmd_tag], response.status_code)
+                raise McuBootCommandError(CommandTag[cmd_tag], self.status_code)
         else:
             logger.info(f"CMD: Successfully Received {len(data)} from {length} Bytes")
 
@@ -189,7 +189,7 @@ class McuBoot:
         logger.debug('RX-PACKET: ' + str(response))
         self._status_code = response.status_code
         if response.status_code != StatusCode.SUCCESS:
-            logger.debug(f"CMD: Send Error, " + self.status_info)
+            logger.debug("CMD: Send Error, " + self.status_info)
             if self._cmd_exception:
                 raise McuBootCommandError(CommandTag[cmd_tag], self.status_code)
             return False

@@ -49,6 +49,10 @@ In case of development, install it from cloned sources:
 2. Specify the `--user` option to install locally into your home directory (export "~/.local/bin" into PATH variable if haven't).
 3. Run the command in a [virtualenv](https://virtualenv.pypa.io/en/latest/) local to a specific project working set.
 
+> For running `mboot` module or CLI without root privileges in Linux OS copy following udev rules
+[90-imx-sdp.rules](https://github.com/molejar/pyIMX/blob/master/udev/90-imx-sdp.rules)
+into `/etc/udev/rules.d` directory and reload it with command: `sudo udevadm control --reload-rules`.
+
 Usage
 -----
 
@@ -117,8 +121,8 @@ if devices:
         print(str(e))
 ```
 
-`mboot` module is implementing also logging functionality for easy debugging of communication interfaces. All what you 
-need to do is just import `logging` module and set the logging level (`DEBUG` or `INFO`) with following line of code: 
+`mboot` module is implementing also logging functionality for easy debugging all communication interfaces. To get it
+working you need only import `logging` module and set the logging level (`DEBUG` or `INFO`) with following line of code: 
 `logging.basicConfig(level=logging.DEBUG)`
 
 ```python
@@ -150,8 +154,8 @@ DEBUG:MBOOT:USB:Close Interface
 [ mboot ] Tool
 --------------
 
-pyMBoot is distributed with command-line utility `mboot`, which demonstrate the complete functionality of this library and
-can be used as replacement of `blhos` tool. If you write `mboot` into shell and click enter, then you get the description 
+The `mboot` module is distributed with command-line utility, which demonstrate the complete functionality of this library 
+and can be used as replacement of `blhos` tool. If you write `mboot` into shell and click enter, then you get the description 
 of its usage. For getting the help of individual commands just use `mboot <command name> -?`.
 
 ``` bash

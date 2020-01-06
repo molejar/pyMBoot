@@ -8,7 +8,7 @@
 
 
 from os import path
-from setuptools import setup
+from setuptools import setup, find_packages
 from mboot import __version__, __license__, __author__, __contact__
 
 
@@ -43,15 +43,15 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
-        'Operating System :: POSIX :: Linux',
-        'Operating System :: Microsoft :: Windows',
-        'Environment :: Console',
         'License :: OSI Approved :: BSD License',
+        'Operating System :: Microsoft :: Windows',
+        'Operating System :: POSIX :: Linux',
+        'Environment :: Console',
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Embedded Systems',
         'Topic :: Utilities',
     ],
-    packages=['mboot'],
+    packages=find_packages('.'),
     entry_points={
         'console_scripts': [
             'mboot = mboot.__main__:main',
