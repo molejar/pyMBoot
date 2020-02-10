@@ -10,7 +10,7 @@ from .memories import ExtMemPropTags, ExtMemId
 from .properties import PropertyTag, PeripheryTag, Version, parse_property_value
 from .exceptions import McuBootError, McuBootCommandError, McuBootConnectionError
 from .errorcodes import StatusCode
-from .connection import scan_usb
+from .connection import scan_usb, scan_uart
 
 
 __author__ = "Martin Olejar"

@@ -79,7 +79,7 @@ if devices:
     mb.close()
 ```
 
-`McuBoot` class is supporting `with` statement what is eliminating the explicit call of `open` and `close` methods. The 
+`McuBoot` class is supporting `with` statement what is eliminating the explicit calls of `open` and `close` methods. The 
 code then looks more cleaner as you can see in following example.
 
 ```python
@@ -134,8 +134,7 @@ logging.basicConfig(level=logging.DEBUG)
 **The example of terminal output with enabled logging functionality:**
 
 ```text
-INFO:MBOOT:Connect: USB COMPOSITE DEVICE (0x15A2, 0x0073)
-DEBUG:MBOOT:USB:Open Interface
+DEBUG:MBOOT:USB: Open Interface
 INFO:MBOOT:CMD: ReadMemory(address=0x00000000, length=100, mem_id=0)
 DEBUG:MBOOT:TX-PACKET: Tag=ReadMemory, Flags=0x00, p0=0x00000000, p1=0x00000064, p2=0x00000000
 DEBUG:MBOOT:USB:OUT[64]: 01 00 20 00 03 00 00 03 00 00 00 00 64 00 00 00 00 00 00 00 00 00 00 00 00 ...
@@ -148,7 +147,7 @@ DEBUG:MBOOT:USB:IN [36]: 04 00 04 00 09 01 00 00 09 01 00 00 09 01 00 00 09 01 0
 DEBUG:MBOOT:USB:IN [36]: 03 00 0C 00 A0 00 00 02 00 00 00 00 03 00 00 00 09 01 00 00 09 01 00 00 09 ...
 DEBUG:MBOOT:RX-PACKET: Tag=GenericResponse, Status=Success, Cmd=ReadMemory
 INFO:MBOOT:CMD: Successfully Received 100 from 100 Bytes
-DEBUG:MBOOT:USB:Close Interface
+DEBUG:MBOOT:USB: Close Interface
 ```
 
 [ mboot ] Tool
@@ -269,10 +268,8 @@ Get list of available memories (internal and external)
 
 #### $ mboot read [OPTIONS] ADDRESS [LENGTH]
 
-Read data from MCU memory and store it into file as binary (*.bin), intel-hex (*.hex, *.ihex) or s-record (*.srec, *.s19) 
+Read data from MCU memory and store it into file in binary (*.bin), intel-hex (*.hex, *.ihex) or s-record (*.srec, *.s19) 
 format. If output file is not specified, the data are dumped into stdout in readable format. 
-
-> LENGTH argument is optional and as default will be used the size to end of memory
 
 ##### options:
 * **-c, --compress** - Compress dump output. (default: False)

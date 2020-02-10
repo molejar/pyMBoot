@@ -5,9 +5,6 @@
 # or at https://spdx.org/licenses/BSD-3-Clause.html#licenseText
 
 
-from ..commands import CmdPacket, CmdResponse, parse_cmd_response
-
-
 class DevConnBase:
 
     @property
@@ -21,6 +18,9 @@ class DevConnBase:
         raise NotImplementedError()
 
     def close(self):
+        raise NotImplementedError()
+
+    def abort(self):
         raise NotImplementedError()
 
     def read(self, timeout=1000):

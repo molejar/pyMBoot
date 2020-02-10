@@ -10,7 +10,8 @@ import logging
 import collections
 from time import time
 from struct import pack, unpack_from
-from .base import DevConnBase, CmdPacket, parse_cmd_response
+from .base import DevConnBase
+from ..commands import CmdPacket, parse_cmd_response
 
 logger = logging.getLogger('MBOOT:USB')
 
@@ -28,6 +29,10 @@ USB_DEVICES = {
     'IMXRT': (0x1FC9, 0x0135)
 }
 
+
+########################################################################################################################
+# Scan USB method
+########################################################################################################################
 
 def scan_usb(device_name: str = None) -> list:
     """
@@ -103,6 +108,9 @@ class RawHidBase(DevConnBase):
     def close(self):
         raise NotImplementedError()
 
+    def abort(self):
+        pass
+
     def read(self, timeout=1000):
         raise NotImplementedError()
 
@@ -148,14 +156,14 @@ if os.name == "nt":
 
         def open(self):
             """ open the interface """
-            logger.debug("Open Interface")
+            logger.debug(" Open Interface")
             self.device.set_raw_data_handler(self.__rx_handler)
             self.device.open(shared=False)
             self._opened = True
 
         def close(self):
             """ close the interface """
-            logger.debug("Close Interface")
+            logger.debug(" Close Interface")
             self.device.close()
             self._opened = False
 
@@ -256,12 +264,12 @@ else:
 
         def open(self):
             """ open the interface """
-            logger.debug("Open Interface")
+            logger.debug(" Open Interface")
             self._opened = True
 
         def close(self):
             """ close the interface """
-            logger.debug("Close Interface")
+            logger.debug(" Close Interface")
             self._opened = False
             try:
                 if self.device:

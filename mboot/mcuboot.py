@@ -77,6 +77,19 @@ class McuBoot:
     def __exit__(self, *args, **kwargs):
         self.close()
 
+    def open(self):
+        """ Connect to device """
+        if not self._device.is_opened:
+            self._device.open()
+
+    def close(self):
+        """ Disconnect device """
+        self._device.close()
+
+    def abort(self):
+        """ Abort executed operation """
+        self._device.abort()
+
     def _check_response(self, cmd_packet: CmdPacket, cmd_response: CmdResponse, logger_info: bool = True):
 
         cmd_name = CommandTag[cmd_packet.header.tag]
@@ -196,16 +209,6 @@ class McuBoot:
 
         logger.info(f"CMD: Successfully Send {len(data)} Bytes")
         return True
-
-    def open(self):
-        """ Connect to device """
-        if not self._device.is_opened:
-            logger.info('Connect: %s', self._device.info())
-            self._device.open()
-
-    def close(self):
-        """ Disconnect device """
-        self._device.close()
 
     def get_property_list(self) -> list:
         """

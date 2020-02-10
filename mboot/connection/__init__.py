@@ -7,3 +7,4 @@
 
 from .base import DevConnBase
 from .usb import scan_usb, RawHid
+from .uart import scan_uart, Uart

@@ -1,4 +1,4 @@
-# Copyright (c) 2017 Martin Olejar
+# Copyright (c) 2019 Martin Olejar
 #
 # SPDX-License-Identifier: BSD-3-Clause
 # The BSD-3-Clause license for this file can be found in the LICENSE file included with this distribution
@@ -462,7 +462,7 @@ def write(ctx, address, offset, mtype, erase, verify, file):
     if ctx.obj['DEBUG']:
         click.echo()
 
-    click.echo(" Wrote Successfully.")
+    click.echo(" Writen Successfully.")
 
 
 # McuBoot: memory read command
