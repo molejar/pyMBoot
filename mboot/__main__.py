@@ -383,7 +383,7 @@ def mconf(ctx, address, word, mtype, file):
 
 # McuBoot: receive SB file command
 @cli.command(short_help="Receive SB file")
-@click.argument('file', nargs=1, type=ImgFile(('.bin', '.sb', '.sb2'), True))
+@click.argument('file', nargs=1, type=ImgFile('.bin', '.sb', '.sb2', exists=True))
 @click.pass_context
 def sbfile(ctx, file):
 
