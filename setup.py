@@ -36,8 +36,7 @@ setup(
         'pyserial==3.4',
         'bincopy==16.0.0',
         'easy_enum==0.3.0',
-        'pyusb==1.0.2',
-        'pywinusb==0.4.2;platform_system=="Windows"',
+        'fido2==0.8.1',
     ],
     classifiers=[
         'Programming Language :: Python :: 3.6',
